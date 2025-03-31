@@ -95,6 +95,8 @@ export function usePromoters() {
         created_by: currentUser.id // Use employee ID from UserContext
       };
 
+      console.log('Creating promoter with data:', promoterData);
+
       // Upload photo if provided
       if (photoFile) {
         const photoUrl = await uploadPromoterPhoto(photoFile);
@@ -103,6 +105,7 @@ export function usePromoters() {
 
       // Create promoter in Supabase
       const newPromoter = await createPromoter(promoterData);
+      console.log('New promoter created:', newPromoter);
 
       // Refresh the promoters list to get the latest data
       await loadPromoters();
