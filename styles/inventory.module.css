@@ -1,0 +1,131 @@
+/* Inventory Management Styles */
+
+.container {
+  padding: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.tabs {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.tab {
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  background-color: #f3f4f6;
+}
+
+.tabActive {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.searchBar {
+  margin-bottom: 1rem;
+}
+
+.buttonGroup {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.card {
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.employeeCard {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  background-color: #f3f4f6;
+  margin-bottom: 1rem;
+}
+
+.employeeAvatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background-color: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.employeeName {
+  font-weight: 500;
+}
+
+.brandList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.brandCard {
+  padding: 1rem;
+  border-radius: 0.25rem;
+  background-color: #f3f4f6;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.brandCard:hover {
+  background-color: #e5e7eb;
+}
+
+.itemList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.itemCard {
+  padding: 1rem;
+  border-radius: 0.25rem;
+  background-color: #f3f4f6;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.itemCard:hover {
+  background-color: #e5e7eb;
+}
+
+.itemImage {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.itemName {
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.itemQuantity {
+  color: #6b7280;
+} 
