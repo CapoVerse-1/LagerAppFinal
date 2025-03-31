@@ -171,6 +171,7 @@ export default function PromoterView({
                     photo_url: p.photo_url || undefined,
                     phone_number: p.phone_number || undefined,
                     clothing_size: p.clothing_size || undefined,
+                    address: p.address || undefined,
                     is_active: p.is_active,
                     transactionCount: p.transactionCount
                   }))}
@@ -208,6 +209,7 @@ export default function PromoterView({
               photo_url: p.photo_url || undefined,
               phone_number: p.phone_number || undefined,
               clothing_size: p.clothing_size || undefined,
+              address: p.address || undefined,
               is_active: p.is_active,
               transactionCount: p.transactionCount
             }))}

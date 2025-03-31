@@ -191,6 +191,11 @@ export default function PromoterList({
                   Größe: {promoter.clothing_size}
                 </p>
               )}
+              {promoter.address && (
+                <p className="text-sm text-center text-gray-500 mt-1">
+                  Adresse: {promoter.address}
+                </p>
+              )}
               <Button 
                 variant="outline" 
                 className="w-full mt-2"
