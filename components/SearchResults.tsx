@@ -51,20 +51,20 @@ export default function SearchResults({ results, onResultClick, loading, query }
   return (
     <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border rounded-md shadow-lg">
       <Tabs defaultValue="all" className="w-full">
-        <TabsList className="w-full grid grid-cols-5">
-          <TabsTrigger value="all" className="text-xs">
+        <TabsList className="w-full flex overflow-x-auto whitespace-nowrap">
+          <TabsTrigger value="all" className="text-xs flex-1 min-w-fit px-2">
             All ({results.allResults.length})
           </TabsTrigger>
-          <TabsTrigger value="brands" className="text-xs">
+          <TabsTrigger value="brands" className="text-xs flex-1 min-w-fit px-2">
             <Tag className="h-3 w-3 mr-1" /> Brands ({results.brands.length})
           </TabsTrigger>
-          <TabsTrigger value="items" className="text-xs">
+          <TabsTrigger value="items" className="text-xs flex-1 min-w-fit px-2">
             <Package className="h-3 w-3 mr-1" /> Items ({results.items.length})
           </TabsTrigger>
-          <TabsTrigger value="promoters" className="text-xs">
+          <TabsTrigger value="promoters" className="text-xs flex-1 min-w-fit px-2">
             <User className="h-3 w-3 mr-1" /> Promoters ({results.promoters.length})
           </TabsTrigger>
-          <TabsTrigger value="transactions" className="text-xs">
+          <TabsTrigger value="transactions" className="text-xs flex-1 min-w-fit px-2">
             <History className="h-3 w-3 mr-1" /> Transactions ({results.transactions.length})
           </TabsTrigger>
         </TabsList>
