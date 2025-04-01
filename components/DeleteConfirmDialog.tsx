@@ -2,6 +2,10 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X } from 'lucide-react';
+import { cn } from "@/lib/utils";
+
+// Custom styles to hide the default close button
+const customDialogContentClass = "sm:max-w-md p-0 overflow-hidden bg-white [&>button[data-state]]:hidden";
 
 interface DeleteConfirmDialogProps {
   isOpen: boolean;
@@ -24,7 +28,7 @@ export default function DeleteConfirmDialog({
 }: DeleteConfirmDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md p-0 overflow-hidden bg-white">
+      <DialogContent className={customDialogContentClass}>
         <div className="p-6">
           <div className="flex justify-between items-center mb-2">
             <DialogTitle className="text-xl font-medium">{title}</DialogTitle>
