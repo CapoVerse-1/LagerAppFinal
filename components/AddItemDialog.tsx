@@ -421,31 +421,33 @@ export default function AddItemDialog({ showDialog, setShowDialog, brandId }: Ad
                 </Label>
                 <div className="col-span-3">
                   {multipleSizes ? (
-                    newItem.sizes.map((size, index) => (
-                      <div key={index} className="flex items-center space-x-2 mb-2">
-                        <Input
-                          placeholder="Größe"
-                          value={size.size}
-                          onChange={(e) => {
-                            const newSizes = [...newItem.sizes];
-                            newSizes[index].size = e.target.value;
-                            setNewItem({...newItem, sizes: newSizes});
-                          }}
-                          className="w-1/2"
-                        />
-                        <Input
-                          type="number"
-                          placeholder="Menge"
-                          value={size.quantity}
-                          onChange={(e) => {
-                            const newSizes = [...newItem.sizes];
-                            newSizes[index].quantity = parseInt(e.target.value);
-                            setNewItem({...newItem, sizes: newSizes});
-                          }}
-                          className="w-1/2"
-                        />
-                      </div>
-                    ))
+                    <div className="max-h-[200px] overflow-y-auto pr-1">
+                      {newItem.sizes.map((size, index) => (
+                        <div key={index} className="flex items-center space-x-2 mb-2">
+                          <Input
+                            placeholder="Größe"
+                            value={size.size}
+                            onChange={(e) => {
+                              const newSizes = [...newItem.sizes];
+                              newSizes[index].size = e.target.value;
+                              setNewItem({...newItem, sizes: newSizes});
+                            }}
+                            className="w-1/2 h-8 text-sm"
+                          />
+                          <Input
+                            type="number"
+                            placeholder="Menge"
+                            value={size.quantity}
+                            onChange={(e) => {
+                              const newSizes = [...newItem.sizes];
+                              newSizes[index].quantity = parseInt(e.target.value);
+                              setNewItem({...newItem, sizes: newSizes});
+                            }}
+                            className="w-1/2 h-8 text-sm"
+                          />
+                        </div>
+                      ))}
+                    </div>
                   ) : (
                     <Input
                       id="quantity"
@@ -460,6 +462,7 @@ export default function AddItemDialog({ showDialog, setShowDialog, brandId }: Ad
                       onClick={() => setNewItem({...newItem, sizes: [...newItem.sizes, { size: '', quantity: 0 }]})}
                       variant="outline"
                       className="mt-2"
+                      size="sm"
                     >
                       Größe hinzufügen
                     </Button>
