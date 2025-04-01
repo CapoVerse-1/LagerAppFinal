@@ -7,6 +7,7 @@ import Image from "next/image"
 import EditPromoterDialog from './EditPromoterDialog'
 import PromoterHistoryDialog from './PromoterHistoryDialog'
 import InactiveConfirmDialog from './InactiveConfirmDialog'
+import DeleteConfirmDialog from './DeleteConfirmDialog'
 import { usePinned } from '../hooks/usePinned'
 import { Skeleton } from './ui/skeleton'
 import { usePromoters, PromoterWithDetails } from '@/hooks/usePromoters'
@@ -27,6 +28,9 @@ export default function PromoterList({
   const [selectedPromoterHistory, setSelectedPromoterHistory] = useState<PromoterWithDetails | null>(null)
   const [showInactiveConfirmDialog, setShowInactiveConfirmDialog] = useState(false)
   const [inactivePromoter, setInactivePromoter] = useState<PromoterWithDetails | null>(null)
+  const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false)
+  const [deletingPromoter, setDeletingPromoter] = useState<PromoterWithDetails | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   
   // Transform promoters to match usePinned requirements
   const promotersForPinned = promoters.map(p => ({
@@ -48,11 +52,21 @@ export default function PromoterList({
 
   const handleDelete = async (id: string) => {
     try {
+      setIsDeleting(true);
       await removePromoter(id);
       onPromoterUpdated();
     } catch (error) {
       console.error('Error deleting promoter:', error);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirmDialog(false);
+      setDeletingPromoter(null);
     }
+  }
+
+  const handleDeleteClick = (promoter: PromoterWithDetails) => {
+    setDeletingPromoter(promoter);
+    setShowDeleteConfirmDialog(true);
   }
 
   const handleToggleInactive = (promoter: PromoterWithDetails) => {
@@ -144,7 +158,7 @@ export default function PromoterList({
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={(e) => {
                       e.preventDefault();
-                      handleDelete(promoter.id);
+                      handleDeleteClick(promoter);
                     }}>
                       <Trash className="mr-2 h-4 w-4" />
                       <span>Löschen</span>
@@ -234,6 +248,15 @@ export default function PromoterList({
             setInactivePromoter(null)
           }
         }}
+      />
+      <DeleteConfirmDialog
+        isOpen={showDeleteConfirmDialog}
+        onClose={() => setShowDeleteConfirmDialog(false)}
+        onConfirm={() => deletingPromoter && handleDelete(deletingPromoter.id)}
+        title="Promoter löschen"
+        description="Sind Sie sicher, dass Sie diesen Promoter löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
+        itemName={deletingPromoter?.name}
+        isDeleting={isDeleting}
       />
     </>
   )

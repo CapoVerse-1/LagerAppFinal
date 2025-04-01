@@ -23,6 +23,7 @@ import { recordTakeOut, recordReturn, recordBurn } from '@/lib/api/transactions'
 import PromoterSelector from './PromoterSelector'
 import { supabase } from '@/lib/supabase'
 import { Item } from '@/lib/api/items'
+import DeleteConfirmDialog from './DeleteConfirmDialog'
 
 interface ItemListProps {
   brandId: string;
@@ -158,8 +159,14 @@ export default function ItemList({
     setEditingItem(item)
   }
 
+  const handleDeleteClick = (item: Item) => {
+    setDeletingItem(item);
+    setShowDeleteConfirmDialog(true);
+  }
+
   const handleDelete = async (id: string) => {
     try {
+      setIsDeleting(true);
       await removeItem(id);
       await refreshItems();
       toast({
@@ -172,6 +179,10 @@ export default function ItemList({
         description: "Failed to delete item. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirmDialog(false);
+      setDeletingItem(null);
     }
   }
 
@@ -424,6 +435,10 @@ export default function ItemList({
     }
   };
 
+  const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
+  const [deletingItem, setDeletingItem] = useState<Item | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   if (loading || loadingSizes) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -543,9 +558,12 @@ export default function ItemList({
                               <History className="mr-2" size={16} />
                               History
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDelete(item.id)}>
-                              <Trash className="mr-2" size={16} />
-                              Delete
+                            <DropdownMenuItem onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteClick(item);
+                            }}>
+                              <Trash className="mr-2 h-4 w-4" />
+                              <span>Löschen</span>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -742,6 +760,16 @@ export default function ItemList({
           Error loading items: {error ? String(error) : "Unknown error"}
         </div>
       )}
+
+      <DeleteConfirmDialog
+        isOpen={showDeleteConfirmDialog}
+        onClose={() => setShowDeleteConfirmDialog(false)}
+        onConfirm={() => deletingItem && handleDelete(deletingItem.id)}
+        title="Artikel löschen"
+        description="Sind Sie sicher, dass Sie diesen Artikel löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
+        itemName={deletingItem?.name}
+        isDeleting={isDeleting}
+      />
     </>
   )
 }
