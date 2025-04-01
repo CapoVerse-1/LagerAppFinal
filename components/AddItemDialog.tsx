@@ -421,7 +421,7 @@ export default function AddItemDialog({ showDialog, setShowDialog, brandId }: Ad
                 </Label>
                 <div className="col-span-3">
                   {multipleSizes ? (
-                    <div className="max-h-[200px] overflow-y-auto pr-1">
+                    <div className="max-h-[200px] overflow-y-auto px-1 pb-1 rounded-md">
                       {newItem.sizes.map((size, index) => (
                         <div key={index} className="flex items-center space-x-2 mb-2">
                           <Input
