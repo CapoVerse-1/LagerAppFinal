@@ -122,7 +122,7 @@ export default function PromoterList({
         ) : sortedPromoters.map((promoter) => (
           <Card 
             key={promoter.id} 
-            className={`overflow-hidden ${!promoter.is_active ? 'opacity-50' : ''} cursor-pointer`}
+            className={`overflow-hidden ${!promoter.is_active ? 'opacity-50' : ''} cursor-pointer transition-all duration-300 hover:shadow-lg hover:scale-[1.02] hover:border-primary`}
             onClick={(e) => {
               if ((e.target as HTMLElement).closest('.dropdown-menu-container')) {
                 return;
@@ -130,13 +130,13 @@ export default function PromoterList({
               onPromoterClick?.(promoter);
             }}
           >
-            <div className="relative">
+            <div className="relative group">
               <Image
                 src={promoter.photo_url || '/placeholder.svg'}
                 alt={promoter.name}
                 width={300}
                 height={200}
-                className="w-full h-48 object-cover"
+                className="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-105"
               />
               {isPinned(promoter.id) && (
                 <Pin className="absolute top-2 left-2 h-6 w-6 text-primary" />

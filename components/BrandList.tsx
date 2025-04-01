@@ -109,7 +109,7 @@ export default function BrandList({
           brands.map((brand) => (
             <Card 
               key={`brand-${brand.id}`} 
-              className={`overflow-hidden cursor-pointer ${!brand.is_active ? 'opacity-50' : ''}`} 
+              className={`overflow-hidden cursor-pointer ${!brand.is_active ? 'opacity-50' : ''} transition-all duration-300 hover:shadow-lg hover:scale-[1.02] hover:border-primary`} 
               onClick={() => onBrandClick(brand.id)}
             >
               <div className="relative">
@@ -118,7 +118,7 @@ export default function BrandList({
                   alt={brand.name}
                   width={300}
                   height={200}
-                  className="w-full h-48 object-cover"
+                  className="w-full h-48 object-cover transition-transform duration-300 hover:scale-105"
                 />
                 {brand.is_pinned && (
                   <Pin className="absolute top-2 left-2 h-6 w-6 text-primary" />

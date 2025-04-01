@@ -506,17 +506,17 @@ export default function ItemList({
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
         {sortedItems.map((item) => (
-          <Card key={item.id} className={`overflow-hidden ${!item.isActive ? 'opacity-60' : ''}`}>
+          <Card key={item.id} className={`overflow-hidden ${!item.isActive ? 'opacity-60' : ''} transition-all duration-300 hover:shadow-lg hover:scale-[1.02] hover:border-primary`}>
             <CardContent className="p-0">
               <div className="relative">
-                <div className="h-40 bg-gray-100 flex items-center justify-center">
+                <div className="h-40 bg-gray-100 flex items-center justify-center overflow-hidden">
                   {item.image_url ? (
                     <Image 
                       src={item.image_url} 
                       alt={item.name} 
                       width={160} 
                       height={160} 
-                      className="object-contain h-full w-full"
+                      className="object-contain h-full w-full transition-transform duration-300 hover:scale-110"
                     />
                   ) : (
                     <div className="text-gray-400 text-xl">No Image</div>
