@@ -8,20 +8,14 @@ import { Loader2 } from 'lucide-react';
 import Image from "next/image";
 import { useToast } from '@/hooks/use-toast';
 import { useItems } from '@/hooks/useItems';
+import { Item } from '@/lib/api/items';
 
-interface Item {
-  id: string;
-  name: string;
-  product_id: string;
-  image_url: string | null;
-  original_quantity: number;
-  is_shared?: boolean;
-  brand_id?: string;
+interface ItemWithSizes extends Item {
   sizes?: Array<{ size: string; quantity: number }>;
 }
 
 interface ConfirmSharedItemDialogProps {
-  item: Item | null;
+  item: ItemWithSizes | null;
   brandId: string;
   onConfirm: (item: Item) => void;
   onCancel: () => void;
@@ -43,10 +37,12 @@ export default function ConfirmSharedItemDialog({
     try {
       setIsSubmitting(true);
       
-      // Add the shared item
-      await addSharedItem(item, item.sizes);
+      const baseItem: Item = { ...item };
+      delete (baseItem as any).sizes;
+
+      await addSharedItem(baseItem, item.sizes);
       
-      onConfirm(item);
+      onConfirm(baseItem);
       
       toast({
         title: "Erfolg",
@@ -79,18 +75,6 @@ export default function ConfirmSharedItemDialog({
             <Label className="text-right">Produkt-ID</Label>
             <div className="col-span-3">{item.product_id}</div>
           </div>
-          {item.sizes && item.sizes.length > 0 && (
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">Größen</Label>
-              <div className="col-span-3">
-                {item.sizes.map((size, index) => (
-                  <div key={index} className="mb-1">
-                    {size.size}: {size.quantity}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
           <div className="grid grid-cols-4 items-center gap-4">
             <Label className="text-right">Bild</Label>
             <div className="col-span-3">
