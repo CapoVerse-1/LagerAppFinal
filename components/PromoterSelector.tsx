@@ -38,13 +38,9 @@ export default function PromoterSelector({
     console.log('All promoters:', promoters);
   }, [value, disabled, includeInactive, promoters]);
   
-  // Filter promoters based on search and active status
+  // Filter promoters (no search needed anymore)
   const filteredPromoters = promoters
-    .filter(p => includeInactive || p.is_active)
-    .filter(p => 
-      search === '' || 
-      p.name.toLowerCase().includes(search.toLowerCase())
-    );
+    .filter(p => includeInactive || p.is_active);
     
   // Debug: Log filtered promoters
   useEffect(() => {
@@ -91,12 +87,7 @@ export default function PromoterSelector({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[300px] p-0 overflow-hidden">
-          <Command className="p-0">
-            <CommandInput 
-              placeholder="Promoter suchen..." 
-              value={search}
-              onValueChange={setSearch}
-            />
+          <Command className="max-h-[280px] overflow-y-auto p-1">
             {loading ? (
               <div className="py-6 text-center">
                 <Spinner className="mx-auto" />
@@ -104,10 +95,9 @@ export default function PromoterSelector({
             ) : (
               <>
                 <CommandEmpty>
-                  {/* Empty content, no message shown */}
+                  {/* Empty content */}
                 </CommandEmpty>
-                {/* Add max-height and overflow for scrolling */}
-                <CommandGroup className="max-h-[250px] overflow-y-auto p-1">
+                <CommandGroup>
                   {filteredPromoters.map((promoter) => (
                     <div 
                       key={promoter.id}
