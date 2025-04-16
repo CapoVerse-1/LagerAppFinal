@@ -1,8 +1,12 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTransactionHistory } from '@/hooks/useTransactionHistory';
 import { TransactionType } from '@/lib/api/transactions';
+import { Brand } from '@/lib/api/brands';
+import { useBrands } from '@/hooks/useBrands';
+import { usePromoters } from '@/hooks/usePromoters';
+import { useEmployees } from '@/hooks/useEmployees';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -14,8 +18,6 @@ import { Badge } from "@/components/ui/badge";
 import { CalendarIcon, Loader2, ArrowLeft, ArrowRight, Search, X } from 'lucide-react';
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import { useEmployees } from '@/hooks/useEmployees';
-import { usePromoters } from '@/hooks/usePromoters';
 import { debounce } from 'lodash';
 import { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
@@ -37,6 +39,8 @@ export default function TransactionHistoryView() {
   
   const { employees = [] } = useEmployees() || {};
   const { promoters = [] } = usePromoters() || {};
+  
+  const { brands = [], loading: brandsLoading, error: brandsError } = useBrands() || {};
   
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
@@ -102,6 +106,21 @@ export default function TransactionHistoryView() {
     }
   };
   
+  // Create a map for quick brand lookup by ID
+  const brandsMap = useMemo(() => {
+    const map = new Map<string, string>();
+    console.log("Building brandsMap with brands:", brands);
+    brands.forEach(brand => {
+      if (brand?.id) {
+        map.set(brand.id, brand.name ?? 'Unnamed Brand');
+      } else {
+        console.warn('Skipping invalid brand data for map:', brand);
+      }
+    });
+    console.log("Created brandsMap:", map);
+    return map;
+  }, [brands]);
+  
   // Reset all filters
   const handleResetFilters = () => {
     setSearchTerm('');
@@ -112,26 +131,32 @@ export default function TransactionHistoryView() {
     resetFilters();
   };
   
-  // Get brand name from transaction
-  const getBrandName = (transaction: any): string => {
+  // Get brand name from transaction, trying nested object first, then map lookup
+  const getBrandName = useCallback((transaction: any): string => {
     try {
-      // Check nested structure existence
-      if (transaction?.items?.brands?.name) {
-        return transaction.items.brands.name;
-      } 
-      // Fallback if name isn't directly available (e.g., older transactions?)
-      else if (transaction?.items?.brand_id) {
-        // Maybe fetch brand name based on ID if needed, or show ID as fallback
-        console.warn(`Brand name missing for transaction ${transaction.id}, brand_id: ${transaction.items.brand_id}`);
-        return `Brand ID: ${transaction.items.brand_id.substring(0, 8)}`; 
+      const directName = transaction?.items?.brands?.name;
+      if (directName) {
+        return directName;
       }
-      // Final fallback
-      return "Unbekannte Marke"; 
+
+      const brandId = transaction?.items?.brand_id;
+      if (brandId) {
+        const mappedName = brandsMap.get(brandId);
+        if (mappedName) {
+          return mappedName;
+        } else {
+          console.warn(`Brand name missing for transaction ${transaction.id}, brand_id: ${brandId} not found in brandsMap.`);
+          return `Unknown Brand [${brandId.substring(0, 8)}...]`;
+        }
+      }
+
+      return "N/A";
+
     } catch (error) {
-      console.error("Error getting brand name:", error);
-      return "Fehler Marke";
+      console.error(`Error getting brand name for transaction ${transaction?.id}:`, error);
+      return "Fehler";
     }
-  };
+  }, [brandsMap]);
   
   return (
     <div className="container mx-auto py-6">
@@ -188,9 +213,12 @@ export default function TransactionHistoryView() {
                 </SelectContent>
               </Select>
               
-              <Select value={selectedPromoter} onValueChange={handlePromoterChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Promoter" />
+              <Select
+                value={selectedPromoter}
+                onValueChange={handlePromoterChange}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Promoter wählen" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Alle Promoter</SelectItem>
@@ -274,7 +302,7 @@ export default function TransactionHistoryView() {
         
         <Card>
           <CardContent className="pt-6">
-            {loading ? (
+            {loading || brandsLoading ? (
               <div className="flex justify-center items-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
@@ -302,7 +330,7 @@ export default function TransactionHistoryView() {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        transactions.map((transaction) => (
+                        transactions.map((transaction: any) => (
                           <TableRow key={transaction.id}>
                             <TableCell>{formatTransactionDate(transaction.timestamp)}</TableCell>
                             <TableCell>{transaction.items?.name || 'N/A'}</TableCell>

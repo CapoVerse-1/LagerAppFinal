@@ -7,7 +7,7 @@ import { FileDown, FileUp, Package, History, Plus } from 'lucide-react'
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import * as XLSX from 'xlsx'
-import { useInventoryData, PromoterItem } from '../hooks/useInventoryData'
+import { useInventoryData } from '../hooks/useInventoryData'
 import styles from '../styles/inventory.module.css'
 import BrandView from './BrandView'
 import PromoterView from './PromoterView'
@@ -29,9 +29,8 @@ import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useBrands } from '@/hooks/useBrands'
+import { useItems } from '@/hooks/useItems'
 import { usePromoters } from '@/hooks/usePromoters'
-import { Promoter } from '@/lib/api/promoters'
-import { Item } from '@/lib/api/items'
 
 export default function InventoryManagement() {
   const {
@@ -50,21 +49,29 @@ export default function InventoryManagement() {
   useCurrentUser();
   const searchParams = useSearchParams();
   const { brands: fetchedBrands } = useBrands();
+  const { items: fetchedItems } = useItems();
   const { promoters: fetchedPromoters } = usePromoters();
 
   const [importedData, setImportedData] = useState(null)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showRestockSearchDialog, setShowRestockSearchDialog] = useState(false)
   const [showRestockQuantityDialog, setShowRestockQuantityDialog] = useState(false)
-  const [selectedRestockItem, setSelectedRestockItem] = useState<Item | null>(null)
+  const [selectedRestockItem, setSelectedRestockItem] = useState(null)
   const [showAddBrandDialog, setShowAddBrandDialog] = useState(false)
 
   const excelFileInputRef = useRef(null)
 
+  // Initialize promoterItems as an empty array
+  useEffect(() => {
+    if (!promoterItems || promoterItems.length === 0) {
+      console.log('Initializing promoterItems as an empty array');
+      setPromoterItems([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array means this effect runs only once when component mounts
+
   // Handle URL parameters
   useEffect(() => {
-    if (!searchParams) return;
-
     const brandId = searchParams.get('brandId');
     const itemId = searchParams.get('itemId');
     const promoterId = searchParams.get('promoterId');
@@ -81,92 +88,44 @@ export default function InventoryManagement() {
       }
     }
 
-    // Handle item selection - Let ItemList handle this based on brandId
+    // Handle item selection (only if we have a brand)
+    if (itemId && brandId && fetchedItems.length > 0) {
+      const item = fetchedItems.find(i => i.id === itemId);
+      if (item) {
+        console.log('Setting selected item:', item);
+        setSelectedItem(item);
+      }
+    }
 
     // Handle promoter selection
     if (promoterId && fetchedPromoters.length > 0) {
       const promoter = fetchedPromoters.find(p => p.id === promoterId);
       if (promoter) {
         console.log('Setting selected promoter:', promoter.name);
-        setSelectedPromoter(promoter);
+        setSelectedPromoter(promoter.name);
         setViewMode('promoters');
       }
     }
-  }, [searchParams, fetchedBrands, fetchedPromoters, setSelectedBrand, setSelectedItem, setSelectedPromoter, setViewMode]);
+  }, [searchParams, fetchedBrands, fetchedItems, fetchedPromoters, setSelectedBrand, setSelectedItem, setSelectedPromoter, setViewMode]);
 
-  // Fetch Promoter Inventory Data
-  useEffect(() => {
-    const loadPromoterInventories = async () => {
-      console.log("Attempting to fetch promoter inventories...");
-      if (!promoters || promoters.length === 0) {
-          console.log("Promoters list is empty, cannot fetch inventories.");
-          setPromoterItems([]);
-          return;
-      }
-      try {
-        // Fetch inventory for each promoter and add promoter_id
-        const inventoriesPromises = promoters.map(async (promoter) => {
-          const inventory = await fetchPromoterInventory(promoter.id);
-          // Map the results to include promoter_id and correct property names
-          return inventory.map(invItem => ({
-            promoter_id: promoter.id, // Add promoter ID
-            item_id: invItem.itemId,     // Map to snake_case
-            item_size_id: invItem.itemSizeId, // Map to snake_case
-            quantity: invItem.quantity
-          }));
-        });
-        
-        const inventoriesPerPromoter = await Promise.all(inventoriesPromises);
-        const allPromoterItems: PromoterItem[] = inventoriesPerPromoter.flat(); 
-
-        console.log("Fetched promoter inventories:", allPromoterItems.length, "items total");
-        setPromoterItems(allPromoterItems);
-      } catch (error) {
-        console.error("Error fetching promoter inventories:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load promoter inventory data.",
-          variant: "destructive",
-        });
-        setPromoterItems([]); 
-      }
-    };
-
-    loadPromoterInventories();
-  }, [promoters, setPromoterItems, toast]);
-
-  const handleRestockSearch = (searchTerm: string) => {
+  const handleRestockSearch = (searchTerm) => {
     setShowRestockSearchDialog(true)
   }
 
-  const handleRestockSelect = (item: Item) => {
+  const handleRestockSelect = (item) => {
     setSelectedRestockItem(item)
     setShowRestockSearchDialog(false)
     setShowRestockQuantityDialog(true)
   }
 
-  const handleRestockConfirm = async (itemSizeId: string, quantity: number, handledBy: string) => {
-    if (!selectedRestockItem) {
-       toast({ title: "Error", description: "No item selected for restock.", variant: "destructive" });
-       return;
-    }
-    if (!itemSizeId) {
-       toast({ title: "Error", description: "No size selected for restock.", variant: "destructive" });
-       return;
-    }
+  const handleRestockConfirm = async (quantity, handledBy) => {
     try {
-      await recordRestock({ 
-         itemId: selectedRestockItem.id,
-         itemSizeId: itemSizeId,
-         quantity: quantity, 
-         employeeId: handledBy
-      });
+      await recordRestock(selectedRestockItem.id, quantity, handledBy)
       toast({
         title: "Lagerbestand aufgefüllt",
         description: `${quantity} Einheiten von ${selectedRestockItem.name} wurden hinzugefügt.`,
       })
       setShowRestockQuantityDialog(false)
-      setSelectedRestockItem(null);
     } catch (error) {
       console.error("Error restocking item:", error)
       toast({
@@ -292,13 +251,8 @@ export default function InventoryManagement() {
         {showRestockQuantityDialog && selectedRestockItem && (
           <RestockQuantityDialog
             item={selectedRestockItem}
-            showDialog={showRestockQuantityDialog}
-            setShowDialog={setShowRestockQuantityDialog}
+            onClose={() => setShowRestockQuantityDialog(false)}
             onConfirm={handleRestockConfirm}
-            onClose={() => {
-                setShowRestockQuantityDialog(false);
-                setSelectedRestockItem(null);
-            }}
           />
         )}
 
