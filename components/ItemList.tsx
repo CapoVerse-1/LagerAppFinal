@@ -717,8 +717,7 @@ export default function ItemList({
           item={returningItem} 
           setReturningItem={setReturningItem} 
           onSuccess={handleTransactionSuccess}
-          promoterItems={promoterItems} 
-          promoters={promoters}
+          promoterItems={promoterItems}
         />
       )}
 

@@ -1,59 +1,50 @@
-"use client";
-
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from '@/hooks/use-toast';
 import { recordReturn } from '@/lib/api/transactions';
-import { fetchItemSizes } from '@/lib/api/items';
+import { fetchItemSizes, ItemSize } from '@/lib/api/items';
 import { useUser } from '../contexts/UserContext';
 import PromoterSelector from './PromoterSelector';
 import { supabase } from '@/lib/supabase';
-import { Promoter } from '@/lib/api/promoters';
-import { Loader2 } from 'lucide-react';
+import ReturnWarningDialog from './ReturnWarningDialog';
 
-// Define the structure for promoter items if not already defined
+// Define PromoterItem type (adjust based on actual structure if different)
 interface PromoterItem {
+  id: string;
   item_id: string;
-  item_size_id: string;
-  promoter_id: string;
-  quantity: number;
-  // Optional fields for display in warning - might need fetching/joining if not present
-  promoter_name?: string;
-  // Add other relevant fields if needed, like name, size string etc.
-  // These might need to be fetched/joined if promoterItems only has IDs
+  item_size_id: string; // Assuming size ID is stored
+  promoterId: string;
+  size: string; // Assuming size string is stored
+  productId: string; // Assuming product ID is stored
+  // Add other relevant fields from promoterItems
 }
 
 interface ReturnDialogProps {
-  item: any; // Consider using a more specific type like ItemWithSizeCount
-  setReturningItem: (item: any | null) => void; // Use specific type
+  item: any; // Consider using a more specific type if available
+  setReturningItem: (item: any) => void;
   onSuccess?: () => void;
   promoterItems: PromoterItem[]; // Add promoterItems prop
-  promoters: Promoter[]; // Add promoters prop type
 }
 
 export default function ReturnDialog({
   item,
   setReturningItem,
   onSuccess,
-  promoterItems,
-  promoters
+  promoterItems // Destructure the prop
 }: ReturnDialogProps) {
   const { currentUser } = useUser();
   const { toast } = useToast();
   const [quantity, setQuantity] = useState(1);
   const [promoterId, setPromoterId] = useState("");
   const [sizeId, setSizeId] = useState("");
-  const [sizes, setSizes] = useState<any[]>([]);
+  const [sizes, setSizes] = useState<ItemSize[]>([]); // Use ItemSize type
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notes, setNotes] = useState("");
-  const [inCirculationQuantity, setInCirculationQuantity] = useState(0);
-  const [showWarningDialog, setShowWarningDialog] = useState(false);
-  const [promoterNameForWarning, setPromoterNameForWarning] = useState<string>("");
+  const [showReturnWarning, setShowReturnWarning] = useState(false); // State for warning dialog
 
   // Debug: Log component mount and props
   useEffect(() => {
@@ -71,11 +62,6 @@ export default function ReturnDialog({
           setSizes(itemSizes);
           if (itemSizes.length === 1) {
             setSizeId(itemSizes[0].id);
-            setInCirculationQuantity(itemSizes[0].in_circulation || 0);
-          } else {
-            // Reset if multiple sizes exist and none is selected
-            setSizeId("");
-            setInCirculationQuantity(0);
           }
         } catch (error) {
           console.error("Error fetching item sizes:", error);
@@ -90,12 +76,6 @@ export default function ReturnDialog({
     
     fetchSizes();
   }, [item, toast]);
-
-  // Update inCirculation when size changes
-  useEffect(() => {
-    const selectedSize = sizes.find(s => s.id === sizeId);
-    setInCirculationQuantity(selectedSize ? selectedSize.in_circulation : 0);
-  }, [sizeId, sizes]);
 
   // Debug: Log state changes
   useEffect(() => {
@@ -112,80 +92,140 @@ export default function ReturnDialog({
     setPromoterId(id);
   };
 
-  const handleReturn = async () => {
-    if (!promoterId) { 
-      toast({ title: "Error", description: "Please select a promoter.", variant: "destructive" });
-      return;
+  // Function to perform the actual return logic
+  const performReturn = async () => {
+    // Add check for currentUser before proceeding
+    if (!currentUser?.id) {
+        toast({
+            title: "Error",
+            description: "Benutzerinformation nicht gefunden. Bitte erneut anmelden.",
+            variant: "destructive",
+        });
+        setIsSubmitting(false); // Ensure submitting state is reset
+        return;
     }
-    if (!sizeId) {
-      toast({ title: "Error", description: "Please select a size.", variant: "destructive" });
-      return;
-    }
-    if (quantity <= 0) {
-      toast({ title: "Error", description: "Quantity must be greater than 0.", variant: "destructive" });
-      return;
-    }
-
-    const promoterItem = promoterItems.find(
-      pItem => pItem.promoter_id === promoterId && 
-               pItem.item_id === item.id && 
-               pItem.item_size_id === sizeId && 
-               pItem.quantity > 0
-    );
-
-    if (!promoterItem) {
-      // Find promoter name using the passed promoters array
-      const selectedPromoter = promoters.find(p => p.id === promoterId); 
-      setPromoterNameForWarning(selectedPromoter?.name || `ID: ${promoterId}`);
-      setShowWarningDialog(true); // Show warning
-    } else {
-      await forceReturn(); // Proceed directly if item is found
-    }
-  };
-  
-  const forceReturn = async () => {
-    if (!promoterId || !sizeId || quantity <= 0) { // Re-validate just in case
-      console.error("Invalid state in forceReturn");
-      return;
-    }
-
-    setIsSubmitting(true);
+    
     try {
+      setIsSubmitting(true);
+      
+      console.log('ReturnDialog - Before API call:', {
+        itemId: item.id,
+        itemSizeId: sizeId,
+        quantity: quantity,
+        promoterId: promoterId
+      });
+      
+      // Get current quantities directly from the database for comparison
+      const { data: beforeData } = await supabase
+        .from('item_sizes')
+        .select('available_quantity, in_circulation')
+        .eq('id', sizeId)
+        .single();
+        
+      console.log('ReturnDialog - DB quantities before transaction:', {
+        available: beforeData?.available_quantity,
+        inCirculation: beforeData?.in_circulation
+      });
+      
       await recordReturn({
         itemId: item.id,
         itemSizeId: sizeId,
-        quantity,
-        promoterId: promoterId, // Use promoterId state variable
-        employeeId: currentUser?.id || 'unknown' // Provide fallback
+        quantity: quantity,
+        promoterId: promoterId,
+        employeeId: currentUser.id,
+        notes: notes
       });
+      
+      console.log('ReturnDialog - After API call');
+      
+      // Get updated quantities directly from the database
+      const { data: afterData } = await supabase
+        .from('item_sizes')
+        .select('available_quantity, in_circulation')
+        .eq('id', sizeId)
+        .single();
+        
+      console.log('ReturnDialog - DB quantities after transaction:', {
+        available: afterData?.available_quantity,
+        inCirculation: afterData?.in_circulation
+      });
+      
       toast({
         title: "Success",
         description: "Item returned successfully.",
       });
-      setReturningItem(null);
-      onSuccess?.();
+      
+      if (onSuccess) {
+        console.log('ReturnDialog - Calling onSuccess callback');
+        onSuccess();
+      }
+      
+      setReturningItem(null); // Close the main dialog
     } catch (error) {
       console.error("Error returning item:", error);
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
         title: "Error",
-        description: `Failed to return item: ${errorMessage}`,
+        description: (error as Error).message || "Failed to return item. Please try again.",
         variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
-      setShowWarningDialog(false);
     }
+  };
+
+  // Initial confirmation handler - performs check first
+  const handleConfirmReturn = async () => {
+    if (!item || !sizeId || !promoterId || quantity <= 0) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if the promoter has the item/size
+    const selectedSizeObj = sizes.find(s => s.id === sizeId);
+    if (!selectedSizeObj) {
+        toast({ title: "Error", description: "Selected size not found.", variant: "destructive" });
+        return; 
+    }
+    const hasItem = promoterItems.some(
+      pItem => pItem.promoterId === promoterId && 
+               pItem.productId === item.product_id && // Match on product_id
+               pItem.size === selectedSizeObj.size // Match on size string
+               // Add pItem.quantity >= quantity check if needed?
+               // The prompt only asked if they *have* it, not *enough* quantity
+    );
+
+    if (!hasItem) {
+      // If promoter doesn't have the item, show the warning dialog
+      console.log("Promoter doesn't have the item/size. Showing warning.");
+      setShowReturnWarning(true);
+    } else {
+      // If promoter has the item, proceed directly
+      console.log("Promoter has the item/size. Proceeding with return.");
+      await performReturn();
+    }
+  };
+
+  // Handler for the warning dialog's confirm button
+  const handleConfirmAnyways = async () => {
+    console.log("User confirmed return despite warning.");
+    setShowReturnWarning(false); // Close warning dialog
+    await performReturn(); // Proceed with the return logic
   };
 
   if (!item) return null;
 
   // Find the selected size to display in circulation quantity
   const selectedSize = sizes.find(size => size.id === sizeId);
+  const inCirculationQuantity = selectedSize ? selectedSize.in_circulation : 0;
 
   return (
     <>
-      <Dialog open={!!item} onOpenChange={(open) => !open && !isSubmitting && setReturningItem(null)}>
+      <Dialog open={!!item} onOpenChange={(open) => !open && !showReturnWarning && setReturningItem(null)}> 
+        {/* Main Return Dialog Content */}
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Artikel zurückgeben</DialogTitle>
@@ -258,39 +298,21 @@ export default function ReturnDialog({
           <DialogFooter>
             <Button variant="outline" onClick={() => setReturningItem(null)}>Abbrechen</Button>
             <Button 
-              onClick={handleReturn}
+              onClick={handleConfirmReturn} // This now performs the check
               disabled={isSubmitting || !sizeId || !promoterId || quantity <= 0 || quantity > inCirculationQuantity}
             >
-              {isSubmitting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              Zurückgeben
+              {isSubmitting ? 'Wird gespeichert...' : 'Bestätigen'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={showWarningDialog} onOpenChange={setShowWarningDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Bestätigung erforderlich</AlertDialogTitle>
-            <AlertDialogDescription>
-              Laut System hat Promoter "{promoterNameForWarning}" den Artikel "{item?.name}" 
-              (Größe: {sizes.find(s => s.id === sizeId)?.size || 'N/A'}) derzeit nicht im Inventar.
-              Möchten Sie die Rückgabe trotzdem durchführen?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowWarningDialog(false)}>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction onClick={forceReturn} disabled={isSubmitting}>
-              {isSubmitting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              Trotzdem bestätigen
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Render the Warning Dialog Conditionally */}
+      <ReturnWarningDialog
+        open={showReturnWarning}
+        onClose={() => setShowReturnWarning(false)}
+        onConfirm={handleConfirmAnyways}
+      />
     </>
   );
 } 
