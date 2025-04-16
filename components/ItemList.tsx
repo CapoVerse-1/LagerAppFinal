@@ -507,23 +507,9 @@ export default function ItemList({
                     <div className="text-gray-400 text-xl">No Image</div>
                   )}
                   {isPinned(item.id) && (
-                    <div className="absolute top-2 left-2 bg-primary text-primary-foreground rounded-full p-1">
+                    <div className="absolute top-2 left-2 bg-primary text-primary-foreground rounded-full p-1 shadow-md">
                       <Pin size={16} />
                     </div>
-                  )}
-                  {item.is_shared_instance && !isMassEditMode && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="absolute top-2 right-12 h-8 w-8 text-blue-500 hover:text-blue-700 bg-white/70 hover:bg-white/90 rounded-full shadow-md"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        stopSharingItem(item.id); 
-                      }}
-                      title="Stop sharing this item in this brand"
-                    >
-                      <Link2Off size={16} />
-                    </Button>
                   )}
                 </div>
                 <div className="p-4">
@@ -533,7 +519,21 @@ export default function ItemList({
                       <p className="text-sm text-gray-500 truncate">ID: {item.product_id}</p>
                     </div>
                     {!isMassEditMode && (
-                      <div className="flex-shrink-0 relative">
+                      <div className="flex items-center space-x-1 flex-shrink-0">
+                        {item.is_shared_instance && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-blue-500 hover:text-blue-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              stopSharingItem(item.id); 
+                            }}
+                            title="Stop sharing this item in this brand"
+                          >
+                            <Link2Off size={16} />
+                          </Button>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8">
