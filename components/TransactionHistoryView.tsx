@@ -408,7 +408,7 @@ export default function TransactionHistoryView() {
               <Button
                 variant="secondary"
                 onClick={handleExport}
-                disabled={selectedTransactionIds.size === 0 || selectedPromoter === 'all'}
+                disabled={selectedTransactionIds.size === 0}
               >
                 ÜB exportieren
               </Button>
