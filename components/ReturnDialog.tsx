@@ -7,10 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from '@/hooks/use-toast';
 import { recordReturn } from '@/lib/api/transactions';
 import { fetchItemSizes, ItemSize } from '@/lib/api/items';
+import { getPromoterInventory } from '@/lib/api/promoters'; // Import function to fetch inventory
 import { useUser } from '../contexts/UserContext';
 import PromoterSelector from './PromoterSelector';
 import { supabase } from '@/lib/supabase';
 import ReturnWarningDialog from './ReturnWarningDialog';
+import { Loader2 } from 'lucide-react'; // Import Loader
 
 // Define PromoterItem type (adjust based on actual structure if different)
 interface PromoterItem {
@@ -27,14 +29,14 @@ interface ReturnDialogProps {
   item: any; // Consider using a more specific type if available
   setReturningItem: (item: any) => void;
   onSuccess?: () => void;
-  promoterItems: PromoterItem[]; // Add promoterItems prop
+  // Remove promoterItems prop
 }
 
 export default function ReturnDialog({
   item,
   setReturningItem,
   onSuccess,
-  promoterItems // Destructure the prop
+  // Removed promoterItems prop
 }: ReturnDialogProps) {
   const { currentUser } = useUser();
   const { toast } = useToast();
@@ -43,6 +45,7 @@ export default function ReturnDialog({
   const [sizeId, setSizeId] = useState("");
   const [sizes, setSizes] = useState<ItemSize[]>([]); // Use ItemSize type
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingInventory, setIsCheckingInventory] = useState(false); // Loading state for check
   const [notes, setNotes] = useState("");
   const [showReturnWarning, setShowReturnWarning] = useState(false); // State for warning dialog
 
@@ -184,28 +187,40 @@ export default function ReturnDialog({
       return;
     }
 
-    // Check if the promoter has the item/size
-    const selectedSizeObj = sizes.find(s => s.id === sizeId);
-    if (!selectedSizeObj) {
-        toast({ title: "Error", description: "Selected size not found.", variant: "destructive" });
-        return; 
-    }
-    const hasItem = promoterItems.some(
-      pItem => pItem.promoterId === promoterId && 
-               pItem.productId === item.product_id && // Match on product_id
-               pItem.size === selectedSizeObj.size // Match on size string
-               // Add pItem.quantity >= quantity check if needed?
-               // The prompt only asked if they *have* it, not *enough* quantity
-    );
+    setIsCheckingInventory(true); // Start loading for check
+    let promoterInventory = [];
+    try {
+        // Fetch the specific promoter's inventory
+        promoterInventory = await getPromoterInventory(promoterId);
+        console.log("Fetched promoter inventory for check:", promoterInventory);
 
-    if (!hasItem) {
-      // If promoter doesn't have the item, show the warning dialog
-      console.log("Promoter doesn't have the item/size. Showing warning.");
-      setShowReturnWarning(true);
-    } else {
-      // If promoter has the item, proceed directly
-      console.log("Promoter has the item/size. Proceeding with return.");
-      await performReturn();
+        const selectedSizeObj = sizes.find(s => s.id === sizeId);
+        if (!selectedSizeObj) {
+            toast({ title: "Error", description: "Selected size not found.", variant: "destructive" });
+            setIsCheckingInventory(false);
+            return; 
+        }
+
+        // Check if the fetched inventory contains the item/size
+        const hasItem = promoterInventory.some(
+          (pInvItem: any) => 
+            pInvItem.item?.product_id === item.product_id && // Use item.product_id
+            pInvItem.size?.size === selectedSizeObj.size // Use size.size
+        );
+
+        if (!hasItem) {
+            console.log("Promoter doesn't have the item/size. Showing warning.");
+            setShowReturnWarning(true);
+        } else {
+            console.log("Promoter has the item/size. Proceeding with return.");
+            await performReturn();
+        }
+
+    } catch (error) {
+        console.error("Error checking promoter inventory:", error);
+        toast({ title: "Error", description: "Could not verify promoter inventory.", variant: "destructive" });
+    } finally {
+        setIsCheckingInventory(false); // Stop loading for check
     }
   };
 
@@ -230,78 +245,85 @@ export default function ReturnDialog({
           <DialogHeader>
             <DialogTitle>Artikel zurückgeben</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="returnItem" className="text-right">Artikel</Label>
-              <div className="col-span-3">
-                <p>{item.name || item.product_id}</p>
-              </div>
+          {isCheckingInventory ? (
+            <div className="flex justify-center items-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin" />
             </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="returnSize" className="text-right">Größe</Label>
-              <Select value={sizeId} onValueChange={setSizeId}>
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Größe auswählen" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sizes.map((size) => (
-                    <SelectItem key={size.id} value={size.id}>
-                      {size.size} (Im Umlauf: {size.in_circulation})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="returnQuantity" className="text-right">Menge</Label>
-              <Input
-                id="returnQuantity"
-                type="number"
-                min="1"
-                max={inCirculationQuantity}
-                value={quantity}
-                onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
-                className="col-span-3"
-              />
-              {selectedSize && (
-                <div className="col-span-4 text-right text-sm text-muted-foreground">
-                  Im Umlauf: {inCirculationQuantity}
+          ) : (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="returnItem" className="text-right">Artikel</Label>
+                <div className="col-span-3">
+                  <p>{item.name || item.product_id}</p>
                 </div>
-              )}
-            </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="returnPromoter" className="text-right">Promoter</Label>
-              <div className="col-span-3">
-                <PromoterSelector 
-                  value={promoterId} 
-                  onChange={handlePromoterId} 
-                  placeholder="Promoter auswählen"
-                  includeInactive={true}
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="returnSize" className="text-right">Größe</Label>
+                <Select value={sizeId} onValueChange={setSizeId}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Größe auswählen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sizes.map((size) => (
+                      <SelectItem key={size.id} value={size.id}>
+                        {size.size} (Im Umlauf: {size.in_circulation})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="returnQuantity" className="text-right">Menge</Label>
+                <Input
+                  id="returnQuantity"
+                  type="number"
+                  min="1"
+                  max={inCirculationQuantity}
+                  value={quantity}
+                  onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
+                  className="col-span-3"
+                />
+                {selectedSize && (
+                  <div className="col-span-4 text-right text-sm text-muted-foreground">
+                    Im Umlauf: {inCirculationQuantity}
+                  </div>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="returnPromoter" className="text-right">Promoter</Label>
+                <div className="col-span-3">
+                  <PromoterSelector 
+                    value={promoterId} 
+                    onChange={handlePromoterId} 
+                    placeholder="Promoter auswählen"
+                    includeInactive={true}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="returnNotes" className="text-right">Notizen</Label>
+                <Input
+                  id="returnNotes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Optional: Zusätzliche Informationen"
+                  className="col-span-3"
                 />
               </div>
             </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="returnNotes" className="text-right">Notizen</Label>
-              <Input
-                id="returnNotes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Optional: Zusätzliche Informationen"
-                className="col-span-3"
-              />
-            </div>
-          </div>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setReturningItem(null)}>Abbrechen</Button>
+            <Button variant="outline" onClick={() => setReturningItem(null)} disabled={isSubmitting || isCheckingInventory}>Abbrechen</Button>
             <Button 
-              onClick={handleConfirmReturn} // This now performs the check
-              disabled={isSubmitting || !sizeId || !promoterId || quantity <= 0 || quantity > inCirculationQuantity}
+              onClick={handleConfirmReturn}
+              disabled={isSubmitting || isCheckingInventory || !sizeId || !promoterId || quantity <= 0 || quantity > inCirculationQuantity}
             >
-              {isSubmitting ? 'Wird gespeichert...' : 'Bestätigen'}
+              {(isSubmitting || isCheckingInventory) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {isSubmitting ? 'Wird gespeichert...' : isCheckingInventory ? 'Prüfe Inventar...' : 'Bestätigen'}
             </Button>
           </DialogFooter>
         </DialogContent>
