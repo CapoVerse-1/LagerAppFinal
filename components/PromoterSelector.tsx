@@ -115,7 +115,7 @@ export default function PromoterSelector({
                     </Button>
                   </div>
                 </CommandEmpty>
-                <CommandGroup>
+                <CommandGroup className="max-h-[200px] overflow-y-auto">
                   {filteredPromoters.map((promoter) => (
                     <div 
                       key={promoter.id}
@@ -154,9 +154,8 @@ export default function PromoterSelector({
       {/* Add Promoter Dialog */}
       {showAddDialog && (
         <AddPromoterDialog 
-          open={showAddDialog}
-          onOpenChange={setShowAddDialog}
-          onAddPromoter={handleAddPromoter}
+          showDialog={showAddDialog}
+          setShowDialog={setShowAddDialog}
         />
       )}
     </div>
