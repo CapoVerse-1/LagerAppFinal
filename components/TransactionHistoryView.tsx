@@ -21,6 +21,9 @@ import { de } from "date-fns/locale";
 import { debounce } from 'lodash';
 import { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
+import { Checkbox } from "@/components/ui/checkbox";
+import { Document, Packer, Paragraph, TextRun } from 'docx';
+import { saveAs } from 'file-saver';
 
 export default function TransactionHistoryView() {
   const {
@@ -47,6 +50,7 @@ export default function TransactionHistoryView() {
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedPromoter, setSelectedPromoter] = useState<string>('all');
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
+  const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<string>>(new Set());
   
   // Apply date range filter
   useEffect(() => {
@@ -121,13 +125,27 @@ export default function TransactionHistoryView() {
     return map;
   }, [brands]);
   
-  // Reset all filters
+  // Handle checkbox change for a single transaction
+  const handleCheckboxChange = (transactionId: string, checked: boolean | 'indeterminate') => {
+    setSelectedTransactionIds(prev => {
+      const newSet = new Set(prev);
+      if (checked === true) {
+        newSet.add(transactionId);
+      } else {
+        newSet.delete(transactionId);
+      }
+      return newSet;
+    });
+  };
+  
+  // Reset all filters and selection
   const handleResetFilters = () => {
     setSearchTerm('');
     setDateRange(undefined);
     setSelectedType('all');
     setSelectedPromoter('all');
     setSelectedEmployee('all');
+    setSelectedTransactionIds(new Set());
     resetFilters();
   };
   
@@ -157,6 +175,96 @@ export default function TransactionHistoryView() {
       return "Fehler";
     }
   }, [brandsMap]);
+  
+  // Handle Word document export
+  const handleExport = async () => {
+    if (selectedTransactionIds.size === 0) {
+      alert("Bitte wählen Sie mindestens eine Transaktion für den Export aus.");
+      return;
+    }
+    if (selectedPromoter === 'all') {
+        alert("Bitte wählen Sie einen Promoter aus der Filterliste aus.");
+        return;
+    }
+
+    // Find selected promoter's name
+    const promoter = promoters.find(p => p.id === selectedPromoter);
+    const promoterName = promoter ? promoter.name : 'Unbekannter Promoter';
+
+    // Get current date
+    const currentDate = format(new Date(), "dd.MM.yyyy", { locale: de });
+
+    // Filter selected transactions from the currently loaded transactions
+    const selectedTransactions = transactions.filter(t => selectedTransactionIds.has(t.id));
+
+    // Build the document content
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: [
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Übernahme Bestätigung SalesCrew JTI", bold: true, size: 28 }),
+            ],
+            spacing: { after: 300 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Promotorname: ${promoterName}`, size: 24 }),
+            ],
+            spacing: { after: 150 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Datum der übergabe: ${currentDate}`, size: 24 }),
+            ],
+            spacing: { after: 300 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Artikel, Datum und Uhrzeit:", bold: true, size: 24 }),
+            ],
+            spacing: { after: 150 },
+          }),
+          ...selectedTransactions.map(transaction =>
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `- ${transaction.items?.name || 'N/A'}, ${formatTransactionDate(transaction.timestamp)}`,
+                  size: 22
+                }),
+              ],
+              spacing: { after: 100 },
+              indent: { left: 720 },
+            })
+          ),
+          new Paragraph({
+             children: [new TextRun("")],
+             spacing: { after: 400 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Unterschrift Promotor und unterschrift Salescrew:", size: 24 }),
+            ],
+          }),
+          new Paragraph({
+             children: [new TextRun("______________________________")],
+             spacing: { before: 100 },
+          }),
+        ],
+      }],
+    });
+
+    // Generate and download the file
+    try {
+      const blob = await Packer.toBlob(doc);
+      const safePromoterName = promoterName.replace(/[^a-zA-Z0-9_]/g, '_');
+      saveAs(blob, `Uebergabe_${safePromoterName}_${currentDate}.docx`);
+    } catch (error) {
+        console.error("Error generating Word document:", error);
+        alert("Fehler beim Erstellen des Word-Dokuments.");
+    }
+  };
   
   return (
     <div className="container mx-auto py-6">
@@ -296,6 +404,14 @@ export default function TransactionHistoryView() {
               <Button variant="default" onClick={() => refreshTransactions()}>
                 Aktualisieren
               </Button>
+
+              <Button
+                variant="secondary"
+                onClick={handleExport}
+                disabled={selectedTransactionIds.size === 0 || selectedPromoter === 'all'}
+              >
+                ÜB exportieren
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -312,6 +428,9 @@ export default function TransactionHistoryView() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-[50px]">
+                          
+                        </TableHead>
                         <TableHead className="w-[180px]">Datum</TableHead>
                         <TableHead>Artikel</TableHead>
                         <TableHead>Marke</TableHead>
@@ -325,13 +444,20 @@ export default function TransactionHistoryView() {
                     <TableBody>
                       {!transactions || transactions.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
+                          <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
                             Keine Transaktionen gefunden
                           </TableCell>
                         </TableRow>
                       ) : (
                         transactions.map((transaction: any) => (
                           <TableRow key={transaction.id}>
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedTransactionIds.has(transaction.id)}
+                                onCheckedChange={(checked) => handleCheckboxChange(transaction.id, checked)}
+                                aria-label={`Select transaction ${transaction.id}`}
+                              />
+                            </TableCell>
                             <TableCell>{formatTransactionDate(transaction.timestamp)}</TableCell>
                             <TableCell>{transaction.items?.name || 'N/A'}</TableCell>
                             <TableCell>{getBrandName(transaction)}</TableCell>
