@@ -17,6 +17,8 @@ import { de } from "date-fns/locale";
 import { useEmployees } from '@/hooks/useEmployees';
 import { usePromoters } from '@/hooks/usePromoters';
 import { debounce } from 'lodash';
+import { DateRange } from 'react-day-picker';
+import { cn } from '@/lib/utils';
 
 export default function TransactionHistoryView() {
   const {
@@ -37,14 +39,14 @@ export default function TransactionHistoryView() {
   const { promoters = [] } = usePromoters() || {};
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>({ from: null, to: null });
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedPromoter, setSelectedPromoter] = useState<string>('all');
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
   
   // Apply date range filter
   useEffect(() => {
-    if (dateRange.from || dateRange.to) {
+    if (dateRange?.from || dateRange?.to) {
       const newFilters: any = {};
       if (dateRange.from) {
         newFilters.startDate = dateRange.from.toISOString();
@@ -53,6 +55,8 @@ export default function TransactionHistoryView() {
         newFilters.endDate = dateRange.to.toISOString();
       }
       updateFilters(newFilters);
+    } else {
+      updateFilters({ startDate: undefined, endDate: undefined });
     }
   }, [dateRange, updateFilters]);
   
@@ -101,7 +105,7 @@ export default function TransactionHistoryView() {
   // Reset all filters
   const handleResetFilters = () => {
     setSearchTerm('');
-    setDateRange({ from: null, to: null });
+    setDateRange(undefined);
     setSelectedType('all');
     setSelectedPromoter('all');
     setSelectedEmployee('all');
@@ -109,16 +113,23 @@ export default function TransactionHistoryView() {
   };
   
   // Get brand name from transaction
-  const getBrandName = (transaction: any) => {
+  const getBrandName = (transaction: any): string => {
     try {
-      if (!transaction || !transaction.items) {
-        return "Unknown Brand";
+      // Check nested structure existence
+      if (transaction?.items?.brands?.name) {
+        return transaction.items.brands.name;
+      } 
+      // Fallback if name isn't directly available (e.g., older transactions?)
+      else if (transaction?.items?.brand_id) {
+        // Maybe fetch brand name based on ID if needed, or show ID as fallback
+        console.warn(`Brand name missing for transaction ${transaction.id}, brand_id: ${transaction.items.brand_id}`);
+        return `Brand ID: ${transaction.items.brand_id.substring(0, 8)}`; 
       }
-      // Try to get brand name from the transaction data
-      return transaction.items.brand_id ? `Brand ${transaction.items.brand_id.substring(0, 8)}` : "Unknown Brand";
+      // Final fallback
+      return "Unbekannte Marke"; 
     } catch (error) {
       console.error("Error getting brand name:", error);
-      return "Unknown Brand";
+      return "Fehler Marke";
     }
   };
   
@@ -209,19 +220,26 @@ export default function TransactionHistoryView() {
             <div className="flex flex-wrap gap-4 items-center">
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-[240px] justify-start text-left">
+                  <Button
+                    id="date"
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !dateRange && "text-muted-foreground"
+                    )}
+                  >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange.from ? (
+                    {dateRange?.from ? (
                       dateRange.to ? (
                         <>
-                          {format(dateRange.from, "dd.MM.yy", { locale: de })} -{" "}
+                          {format(dateRange.from, "dd.MM.yy", { locale: de })} - {" "}
                           {format(dateRange.to, "dd.MM.yy", { locale: de })}
                         </>
                       ) : (
-                        format(dateRange.from, "dd.MM.yyyy", { locale: de })
+                        format(dateRange.from, "dd.MM.yy", { locale: de })
                       )
                     ) : (
-                      "Zeitraum auswählen"
+                      <span>Zeitraum auswählen</span>
                     )}
                   </Button>
                 </PopoverTrigger>
@@ -229,13 +247,17 @@ export default function TransactionHistoryView() {
                   <Calendar
                     initialFocus
                     mode="range"
-                    defaultMonth={dateRange.from || undefined}
+                    defaultMonth={dateRange?.from}
                     selected={dateRange}
                     onSelect={setDateRange}
-                    numberOfMonths={1}
+                    numberOfMonths={2}
                     locale={de}
-                    className="w-[280px]"
                   />
+                  <div className="p-2 border-t">
+                    <Button variant="outline" size="sm" onClick={() => setDateRange(undefined)} className="w-full">
+                      Auswahl löschen
+                    </Button>
+                  </div>
                 </PopoverContent>
               </Popover>
               
@@ -283,10 +305,10 @@ export default function TransactionHistoryView() {
                         transactions.map((transaction) => (
                           <TableRow key={transaction.id}>
                             <TableCell>{formatTransactionDate(transaction.timestamp)}</TableCell>
-                            <TableCell>{transaction.items?.name || 'Unbekannt'}</TableCell>
+                            <TableCell>{transaction.items?.name || 'N/A'}</TableCell>
                             <TableCell>{getBrandName(transaction)}</TableCell>
                             <TableCell>{transaction.quantity}</TableCell>
-                            <TableCell>{transaction.item_sizes?.size || 'Einheitsgröße'}</TableCell>
+                            <TableCell>{transaction.item_sizes?.size || 'N/A'}</TableCell>
                             <TableCell className={getTransactionTypeColor(transaction.transaction_type)}>
                               {getTransactionTypeLabel(transaction.transaction_type)}
                             </TableCell>
