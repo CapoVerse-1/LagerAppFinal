@@ -4,7 +4,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { MoreVertical, Edit, Trash, EyeOff, Flame, History, Pin, Loader2, ArrowUpFromLine, ArrowDownToLine, Package, ListChecks } from 'lucide-react'
+import { MoreVertical, Edit, Trash, EyeOff, Flame, History, Pin, Loader2, ArrowUpFromLine, ArrowDownToLine, Package, ListChecks, Link2Off } from 'lucide-react'
 import Image from "next/image"
 import EditItemDialog from './EditItemDialog'
 import BurnItemDialog from './BurnItemDialog'
@@ -14,7 +14,7 @@ import ReturnDialog from './ReturnDialog'
 import RestockQuantityDialog from './RestockQuantityDialog'
 import { useUser } from '../contexts/UserContext'
 import { usePinned } from '../hooks/usePinned'
-import { useItems } from '@/hooks/useItems'
+import { useItems, ItemWithSizeCount } from '@/hooks/useItems'
 import { useToast } from '@/hooks/use-toast'
 import { fetchAllItemSizesForBrand, fetchItemSizes, ItemSize } from '@/lib/api/items'
 import { useTransactions } from '@/hooks/useTransactions'
@@ -22,13 +22,12 @@ import { Promoter } from '@/lib/api/promoters'
 import { recordTakeOut, recordReturn, recordBurn } from '@/lib/api/transactions'
 import PromoterSelector from './PromoterSelector'
 import { supabase } from '@/lib/supabase'
-import { Item } from '@/lib/api/items'
 import DeleteConfirmDialog from './DeleteConfirmDialog'
 
 interface ItemListProps {
   brandId: string;
-  selectedItem: Item | null;
-  setSelectedItem: (item: Item | null) => void;
+  selectedItem: ItemWithSizeCount | null;
+  setSelectedItem: (item: ItemWithSizeCount | null) => void;
   promoters: Promoter[];
   setPromoters: (promoters: Promoter[]) => void;
   promoterItems: any[];
@@ -52,18 +51,19 @@ export default function ItemList({
     error, 
     toggleActive, 
     removeItem,
-    refreshItems
+    refreshItems,
+    stopSharingItem
   } = useItems(brandId);
   
-  const [editingItem, setEditingItem] = useState<Item | null>(null)
-  const [burningItem, setBurningItem] = useState<Item | null>(null)
-  const [takingOutItem, setTakingOutItem] = useState<Item | null>(null)
-  const [returningItem, setReturningItem] = useState<Item | null>(null)
-  const [restockingItem, setRestockingItem] = useState<Item | null>(null)
+  const [editingItem, setEditingItem] = useState<ItemWithSizeCount | null>(null)
+  const [burningItem, setBurningItem] = useState<ItemWithSizeCount | null>(null)
+  const [takingOutItem, setTakingOutItem] = useState<ItemWithSizeCount | null>(null)
+  const [returningItem, setReturningItem] = useState<ItemWithSizeCount | null>(null)
+  const [restockingItem, setRestockingItem] = useState<ItemWithSizeCount | null>(null)
   const [itemChanges, setItemChanges] = useState<Record<string, any>>({})
   const [showDropdown, setShowDropdown] = useState(false)
   const [showHistoryDialog, setShowHistoryDialog] = useState(false)
-  const [selectedItemForHistory, setSelectedItemForHistory] = useState<Item | null>(null)
+  const [selectedItemForHistory, setSelectedItemForHistory] = useState<ItemWithSizeCount | null>(null)
   const [itemSizes, setItemSizes] = useState<Record<string, ItemSize[]>>({})
   const [loadingSizes, setLoadingSizes] = useState(false)
   const [sizesError, setSizesError] = useState<string | null>(null)
@@ -71,9 +71,9 @@ export default function ItemList({
 
   // Mass editing state
   const [isMassEditMode, setIsMassEditMode] = useState(false);
-  const [selectedPromoter, setSelectedPromoter] = useState("");
-  const [selectedAction, setSelectedAction] = useState<'take-out' | 'return' | 'burn' | null>(null);
-  const [itemQuantities, setItemQuantities] = useState<Record<string, { quantity: number; sizeId: string }>>({});
+  const [selectedPromoter, setSelectedPromoter] = useState<Promoter | null>(null);
+  const [selectedAction, setSelectedAction] = useState<string | null>(null);
+  const [itemQuantities, setItemQuantities] = useState<{[key: string]: { sizeId: string; quantity: number }}>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Use the usePinned hook for sorting and pinning functionality
@@ -129,12 +129,12 @@ export default function ItemList({
     
     if (!newMode) {
       // Reset state when turning off mass edit mode
-      setSelectedPromoter("");
+      setSelectedPromoter(null);
       setSelectedAction(null);
       setItemQuantities({});
     } else if (items.length > 0 && Object.keys(itemSizes).length > 0) {
       // Initialize state when turning on mass edit mode
-      const newItemQuantities: Record<string, { quantity: number; sizeId: string }> = {};
+      const newItemQuantities: {[key: string]: { sizeId: string; quantity: number }} = {};
       
       items.forEach(item => {
         const sizes = itemSizes[item.id] || [];
@@ -155,59 +155,46 @@ export default function ItemList({
     setIsMassEditMode(newMode);
   }, [isMassEditMode, items, itemSizes]);
 
-  const handleEdit = (item: Item) => {
+  const handleEdit = (item: ItemWithSizeCount) => {
     setEditingItem(item)
   }
 
-  const handleDeleteClick = (item: Item) => {
-    setDeletingItem(item);
+  const handleDeleteClick = (item: ItemWithSizeCount) => {
+    setItemToDelete(item);
     setShowDeleteConfirmDialog(true);
   }
 
   const handleDelete = async (id: string) => {
     try {
-      setIsDeleting(true);
       await removeItem(id);
-      await refreshItems();
       toast({
-        title: "Item deleted",
-        description: "The item has been successfully deleted.",
+        title: "Erfolg",
+        description: "Artikel wurde erfolgreich gelöscht.",
       });
     } catch (error) {
+      console.error("Error deleting item:", error);
       toast({
         title: "Error",
-        description: "Failed to delete item. Please try again.",
+        description: "Fehler beim Löschen des Artikels.",
         variant: "destructive",
       });
-    } finally {
-      setIsDeleting(false);
-      setShowDeleteConfirmDialog(false);
-      setDeletingItem(null);
     }
+    setShowDeleteConfirmDialog(false);
+    setItemToDelete(null);
   }
 
   const handleToggleInactive = async (id: string) => {
     try {
-      const item = items.find(item => item.id === id);
-      if (!item) {
-        toast({
-          title: "Error",
-          description: "Item not found.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
       await toggleActive(id);
-      await refreshItems();
       toast({
-        title: item.is_active ? "Item deactivated" : "Item activated",
-        description: `The item has been ${item.is_active ? "deactivated" : "activated"}.`,
+        title: "Success",
+        description: "Item status updated.",
       });
     } catch (error) {
+      console.error("Error toggling item status:", error);
       toast({
         title: "Error",
-        description: "Failed to update item status. Please try again.",
+        description: "Failed to update item status.",
         variant: "destructive",
       });
     }
@@ -217,7 +204,7 @@ export default function ItemList({
     togglePin(id);
   }
 
-  const handleBurn = (item: Item) => {
+  const handleBurn = (item: ItemWithSizeCount) => {
     if (!item.id) {
       toast({
         title: "Error",
@@ -229,7 +216,7 @@ export default function ItemList({
     setBurningItem(item);
   }
 
-  const handleTakeOut = (item: Item) => {
+  const handleTakeOut = (item: ItemWithSizeCount) => {
     if (!item.id) {
       toast({
         title: "Error",
@@ -241,7 +228,7 @@ export default function ItemList({
     setTakingOutItem(item);
   }
 
-  const handleReturn = (item: Item) => {
+  const handleReturn = (item: ItemWithSizeCount) => {
     if (!item.id) {
       toast({
         title: "Error",
@@ -253,7 +240,7 @@ export default function ItemList({
     setReturningItem(item);
   }
 
-  const handleRestock = (item: Item) => {
+  const handleRestock = (item: ItemWithSizeCount) => {
     if (!item.id) {
       toast({
         title: "Error",
@@ -265,8 +252,8 @@ export default function ItemList({
     setRestockingItem(item);
   }
 
-  const handleQuantityChange = (item: Item, action: string) => {
-    if (!item.id) {
+  const handleQuantityChange = (item: ItemWithSizeCount, action: string) => {
+    if (!item || !item.id) {
       toast({
         title: "Error",
         description: "Invalid item.",
@@ -293,7 +280,7 @@ export default function ItemList({
     }
   }
 
-  const handleShowHistory = (item: Item) => {
+  const handleShowHistory = (item: ItemWithSizeCount) => {
     if (!item.id) {
       toast({
         title: "Error",
@@ -352,72 +339,70 @@ export default function ItemList({
 
   // Handle mass edit confirmation
   const handleMassEditConfirm = async () => {
-    if (!selectedPromoter || !selectedAction) {
+    if (!selectedAction || !selectedPromoter?.id || !currentUser?.id) { 
       toast({
         title: "Error",
-        description: "Please select a promoter and action.",
+        description: "Please select an action, a promoter, and ensure you are logged in.",
         variant: "destructive",
       });
       return;
     }
 
-    const itemsToProcess = Object.entries(itemQuantities)
-      .filter(([_, data]) => data.quantity > 0 && data.sizeId)
-      .map(([itemId, data]) => ({
-        item: items.find(item => item.id === itemId),
-        quantity: data.quantity,
-        sizeId: data.sizeId
-      }));
-
-    if (itemsToProcess.length === 0) {
-      toast({
-        title: "Error",
-        description: "Please enter quantities and select sizes for at least one item.",
-        variant: "destructive",
-      });
-      return;
-    }
+    const promoterId = selectedPromoter.id; 
+    const employeeId = currentUser.id;
 
     setIsSubmitting(true);
+    let successCount = 0;
+    let errorCount = 0;
+
     try {
-      for (const { item, quantity, sizeId } of itemsToProcess) {
-        switch (selectedAction) {
-          case 'take-out':
-            await recordTakeOut({
-              itemId: item.id,
-              itemSizeId: sizeId,
-              quantity,
-              promoterId: selectedPromoter,
-              employeeId: currentUser?.id,
-              notes: `Mass edit operation`
-            });
-            break;
-          case 'return':
-            await recordReturn({
-              itemId: item.id,
-              itemSizeId: sizeId,
-              quantity,
-              promoterId: selectedPromoter,
-              employeeId: currentUser?.id,
-              notes: `Mass edit operation`
-            });
-            break;
-          case 'burn':
-            await recordBurn({
-              itemId: item.id,
-              itemSizeId: sizeId,
-              quantity,
-              promoterId: selectedPromoter,
-              employeeId: currentUser?.id,
-              notes: `Mass edit operation`
-            });
-            break;
+      for (const itemIdInLoop in itemQuantities) {
+        const { sizeId, quantity } = itemQuantities[itemIdInLoop];
+        if (quantity <= 0) continue; // Skip items with 0 quantity
+
+        try {
+          switch (selectedAction) {
+            case 'take-out':
+              await recordTakeOut({
+                itemId: itemIdInLoop,
+                itemSizeId: sizeId,
+                quantity,
+                promoterId: promoterId,
+                employeeId: employeeId,
+                notes: `Mass edit operation`
+              });
+              break;
+            case 'return':
+              await recordReturn({
+                itemId: itemIdInLoop,
+                itemSizeId: sizeId,
+                quantity,
+                promoterId: promoterId,
+                employeeId: employeeId,
+                notes: `Mass edit operation`
+              });
+              break;
+            case 'burn':
+              await recordBurn({
+                itemId: itemIdInLoop,
+                itemSizeId: sizeId,
+                quantity,
+                promoterId: promoterId,
+                employeeId: employeeId,
+                notes: `Mass edit operation`
+              });
+              break;
+          }
+          successCount++;
+        } catch (error) {
+          console.error(`Error processing item ${itemIdInLoop}:`, error);
+          errorCount++;
         }
       }
 
       toast({
         title: "Success",
-        description: `Successfully processed ${itemsToProcess.length} items.`,
+        description: `Successfully processed ${successCount} items. ${errorCount} items encountered errors.`,
       });
 
       // Reset state
@@ -436,7 +421,7 @@ export default function ItemList({
   };
 
   const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
-  const [deletingItem, setDeletingItem] = useState<Item | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<ItemWithSizeCount | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   if (loading || loadingSizes) {
@@ -483,8 +468,8 @@ export default function ItemList({
             </Select>
             <div className="w-[200px]">
               <PromoterSelector
-                value={selectedPromoter}
-                onChange={setSelectedPromoter}
+                value={selectedPromoter?.id || ''}
+                onChange={(id) => setSelectedPromoter(promoters.find(p => p.id === id) || null)}
                 placeholder="Promoter wählen"
                 includeInactive={selectedAction === 'return'}
               />
@@ -525,6 +510,20 @@ export default function ItemList({
                     <div className="absolute top-2 left-2 bg-primary text-primary-foreground rounded-full p-1">
                       <Pin size={16} />
                     </div>
+                  )}
+                  {item.is_shared_instance && !isMassEditMode && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="absolute top-2 right-12 h-8 w-8 text-blue-500 hover:text-blue-700 bg-white/70 hover:bg-white/90 rounded-full shadow-md"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        stopSharingItem(item.id); 
+                      }}
+                      title="Stop sharing this item in this brand"
+                    >
+                      <Link2Off size={16} />
+                    </Button>
                   )}
                 </div>
                 <div className="p-4">
@@ -764,10 +763,10 @@ export default function ItemList({
       <DeleteConfirmDialog
         isOpen={showDeleteConfirmDialog}
         onClose={() => setShowDeleteConfirmDialog(false)}
-        onConfirm={() => deletingItem && handleDelete(deletingItem.id)}
+        onConfirm={() => itemToDelete && handleDelete(itemToDelete.id)}
         title="Artikel löschen"
         description="Sind Sie sicher, dass Sie diesen Artikel löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
-        itemName={deletingItem?.name}
+        itemName={itemToDelete?.name}
         isDeleting={isDeleting}
       />
     </>

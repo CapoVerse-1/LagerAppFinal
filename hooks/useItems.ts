@@ -12,12 +12,14 @@ import {
   updateItemSize,
   deleteItemSize,
   calculateItemQuantities,
+  unlinkSharedItem,
   Item,
   ItemSize
 } from '@/lib/api/items';
 import { uploadItemImage, updateItemImage, deleteItemImage } from '@/lib/api/storage';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
+import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 export interface ItemWithSizeCount extends Item {
   sizeCount: number;
@@ -27,6 +29,7 @@ export interface ItemWithSizeCount extends Item {
     inCirculation: number;
     totalQuantity: number;
   };
+  is_shared_instance?: boolean;
 }
 
 export function useItems(brandId: string) {
@@ -48,12 +51,19 @@ export function useItems(brandId: string) {
       const itemsData = await fetchItems(effectiveBrandId);
       console.log('useItems - fetchItems returned:', itemsData.length, 'items');
       
-      // Get size counts and quantities for each item
+      // Get size counts, quantities, and determine if it's a shared instance for each item
       const itemsWithDetails = await Promise.all(
         itemsData.map(async (item) => {
           const count = await countItemSizes(item.id);
           const quantities = await calculateItemQuantities(item.id);
-          return { ...item, sizeCount: count, quantities };
+          // Determine if it's a shared instance for the *current* brand
+          const is_shared_instance = item.is_shared === true && item.brand_id !== effectiveBrandId;
+          return { 
+            ...item, 
+            sizeCount: count, 
+            quantities,
+            is_shared_instance
+          };
         })
       );
       
@@ -645,6 +655,38 @@ export function useItems(brandId: string) {
     }
   };
 
+  // Stop sharing an item for the current brand
+  const stopSharingItem = async (itemId: string): Promise<void> => {
+    try {
+      if (!brandId) {
+        throw new Error("Brand ID is required to stop sharing.");
+      }
+      console.log(`useItems - stopSharingItem called for item ${itemId} in brand ${brandId}`);
+      
+      // Call the API function to remove the link in shared_items table
+      await unlinkSharedItem(itemId, brandId);
+      
+      console.log(`useItems - Shared link removed for item ${itemId} in brand ${brandId}`);
+      
+      toast({
+        title: 'Success',
+        description: 'Item sharing has been stopped for this brand.',
+      });
+
+      // Refresh the items list to reflect the change
+      await refreshItems(); 
+
+    } catch (err) {
+      console.error('Error stopping item sharing:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to stop sharing the item. Please try again.',
+        variant: 'destructive',
+      });
+      throw err; // Rethrow error for potential handling upstream
+    }
+  };
+
   // Add real-time subscription to shared item updates
   useEffect(() => {
     if (!brandId) return;
@@ -660,17 +702,18 @@ export function useItems(brandId: string) {
           table: 'items',
           filter: 'is_shared=eq.true'
         },
-        (payload) => {
+        (payload: RealtimePostgresChangesPayload<{ [key: string]: any }>) => {
           console.log('Shared item changed:', payload);
           
           // Check if this item exists in our current items list
-          const changedItemId = payload.new?.id;
-          const exists = items.some(item => item.id === changedItemId);
-          
-          if (exists) {
-            console.log('Refreshing items due to shared item update');
-            // Refresh our items to get the updated data
-            refreshItems();
+          const changedItemId = (payload.new as { id?: string })?.id;
+          if (changedItemId) {
+            const exists = items.some(item => item.id === changedItemId);
+            if (exists) {
+              console.log('Refreshing items due to shared item update');
+              // Refresh our items to get the updated data
+              refreshItems();
+            }
           }
         }
       )
@@ -686,11 +729,11 @@ export function useItems(brandId: string) {
           schema: 'public',
           table: 'item_sizes'
         },
-        async (payload) => {
+        async (payload: RealtimePostgresChangesPayload<{ [key: string]: any }>) => {
           console.log('Item size changed:', payload);
           
-          // Get the item ID for this size
-          const itemSizeId = payload.new?.id || payload.old?.id;
+          // Get the item ID for this size using type assertion and optional chaining
+          const itemSizeId = (payload.new as { id?: string })?.id || (payload.old as { id?: string })?.id;
           
           if (itemSizeId) {
             try {
@@ -740,6 +783,7 @@ export function useItems(brandId: string) {
     updateSize,
     removeSize,
     fetchSizes,
+    stopSharingItem,
     refreshItems
   };
 }
