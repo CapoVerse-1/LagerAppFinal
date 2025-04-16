@@ -104,18 +104,10 @@ export default function PromoterSelector({
             ) : (
               <>
                 <CommandEmpty>
-                  <div className="py-3 px-2 text-sm text-muted-foreground">
-                    Kein Promoter gefunden.
-                    <Button 
-                      variant="link" 
-                      className="px-2 py-1 h-auto"
-                      onClick={() => setShowAddDialog(true)}
-                    >
-                      Neuen Promoter erstellen?
-                    </Button>
-                  </div>
+                  {/* Empty content, no message shown */}
                 </CommandEmpty>
-                <CommandGroup className="max-h-[200px] overflow-y-auto">
+                {/* Add max-height and overflow for scrolling */}
+                <CommandGroup className="max-h-[300px] overflow-y-auto">
                   {filteredPromoters.map((promoter) => (
                     <div 
                       key={promoter.id}
@@ -135,29 +127,24 @@ export default function PromoterSelector({
                     </div>
                   ))}
                 </CommandGroup>
-                <div className="p-1 border-t">
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-start"
-                    onClick={() => setShowAddDialog(true)}
-                  >
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Neuen Promoter erstellen
-                  </Button>
-                </div>
               </>
             )}
           </Command>
         </PopoverContent>
       </Popover>
 
-      {/* Add Promoter Dialog */}
+      {/* Add Promoter Dialog can remain if triggered by an external button, 
+          but it's not needed for the dropdown itself */}
+       {/* 
       {showAddDialog && (
         <AddPromoterDialog 
-          showDialog={showAddDialog}
-          setShowDialog={setShowAddDialog}
+          // Remove props as the component usage is commented out
+          // open={showAddDialog}
+          // onOpenChange={setShowAddDialog}
+          // onAddPromoter={handleAddPromoter} 
         />
       )}
+      */}
     </div>
   );
 } 
