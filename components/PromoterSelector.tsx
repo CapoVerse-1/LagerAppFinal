@@ -28,8 +28,6 @@ export default function PromoterSelector({
   includeInactive = false
 }: PromoterSelectorProps) {
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const [showAddDialog, setShowAddDialog] = useState(false);
   const { promoters, loading, addPromoter, refreshPromoters } = usePromoters();
   
   // Debug: Log props and promoters
@@ -38,7 +36,7 @@ export default function PromoterSelector({
     console.log('All promoters:', promoters);
   }, [value, disabled, includeInactive, promoters]);
   
-  // Filter promoters (no search needed anymore)
+  // Filter promoters based on active status
   const filteredPromoters = promoters
     .filter(p => includeInactive || p.is_active);
     
@@ -50,7 +48,6 @@ export default function PromoterSelector({
   // Handle adding a new promoter
   const handleAddPromoter = async (name: string, photoFile: File | null) => {
     await addPromoter(name, photoFile);
-    setShowAddDialog(false);
     await refreshPromoters();
   };
   
@@ -61,7 +58,6 @@ export default function PromoterSelector({
 
   // Handle promoter selection directly
   const handleSelectPromoter = (promoterId: string) => {
-    console.log('Manually handling promoter selection:', promoterId);
     onChange(promoterId);
     setOpen(false);
   };
@@ -87,7 +83,7 @@ export default function PromoterSelector({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[300px] p-0 overflow-hidden">
-          <Command className="max-h-[280px] overflow-y-auto p-1">
+          <Command className="p-0">
             {loading ? (
               <div className="py-6 text-center">
                 <Spinner className="mx-auto" />
@@ -95,9 +91,10 @@ export default function PromoterSelector({
             ) : (
               <>
                 <CommandEmpty>
-                  {/* Empty content */}
+                  {/* Empty content, no message shown */}
                 </CommandEmpty>
-                <CommandGroup>
+                {/* Add max-height and overflow for scrolling */}
+                <CommandGroup className="max-h-[250px] overflow-y-auto p-1">
                   {filteredPromoters.map((promoter) => (
                     <div 
                       key={promoter.id}
