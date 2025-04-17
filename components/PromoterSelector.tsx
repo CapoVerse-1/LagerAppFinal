@@ -12,7 +12,7 @@ import AddPromoterDialog from './AddPromoterDialog';
 
 interface PromoterSelectorProps {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (promoter: Promoter | null) => void;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
@@ -56,9 +56,10 @@ export default function PromoterSelector({
     console.log('Dropdown open state:', open);
   }, [open]);
 
-  // Handle promoter selection directly
+  // Handle promoter selection - find the object and pass it back
   const handleSelectPromoter = (promoterId: string) => {
-    onChange(promoterId);
+    const foundPromoter = promoters.find(p => p.id === promoterId);
+    onChange(foundPromoter || null); // Pass the object or null
     setOpen(false);
   };
 

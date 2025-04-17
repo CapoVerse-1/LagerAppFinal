@@ -469,11 +469,9 @@ export default function ItemList({
             <div className="w-[200px]">
               <PromoterSelector
                 value={selectedPromoter?.id || ''}
-                onChange={(id) => {
-                  console.log("[ItemList] PromoterSelector onChange triggered with id:", id);
-                  const foundPromoter = promoters.find(p => p.id === id);
-                  console.log("[ItemList] Found promoter object:", foundPromoter);
-                  setSelectedPromoter(foundPromoter || null);
+                onChange={(promoter) => {
+                  console.log("[ItemList] PromoterSelector onChange received promoter:", promoter);
+                  setSelectedPromoter(promoter);
                   console.log("[ItemList] setSelectedPromoter called."); 
                 }}
                 placeholder="Promoter wählen"
