@@ -469,14 +469,20 @@ export default function ItemList({
             <div className="w-[200px]">
               <PromoterSelector
                 value={selectedPromoter?.id || ''}
-                onChange={(id) => setSelectedPromoter(promoters.find(p => p.id === id) || null)}
+                onChange={(id) => {
+                  console.log("[ItemList] PromoterSelector onChange triggered with id:", id);
+                  const foundPromoter = promoters.find(p => p.id === id);
+                  console.log("[ItemList] Found promoter object:", foundPromoter);
+                  setSelectedPromoter(foundPromoter || null);
+                  console.log("[ItemList] setSelectedPromoter called."); 
+                }}
                 placeholder="Promoter wählen"
                 includeInactive={selectedAction === 'return'}
               />
             </div>
             <Button
               onClick={handleMassEditConfirm}
-              disabled={isSubmitting || !selectedAction || !selectedPromoter || Object.keys(itemQuantities).length === 0}
+              disabled={isSubmitting || !selectedAction || !selectedPromoter || Object.values(itemQuantities).every(q => q.quantity <= 0)}
               className={`
                 ${selectedAction === 'take-out' ? 'border-2 border-red-500 bg-transparent hover:bg-transparent hover:border-red-600 text-red-500 hover:text-red-600' : ''}
                 ${selectedAction === 'return' ? 'border-2 border-green-500 bg-transparent hover:bg-transparent hover:border-green-600 text-green-500 hover:text-green-600' : ''}
@@ -717,7 +723,6 @@ export default function ItemList({
           item={returningItem} 
           setReturningItem={setReturningItem} 
           onSuccess={handleTransactionSuccess}
-          promoterItems={promoterItems}
         />
       )}
 
