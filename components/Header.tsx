@@ -21,10 +21,10 @@ export default function Header() {
           </Link>
           <nav className="flex items-center space-x-6 text-sm font-medium">
             <Link
-              href="/alle-items"
+              href="/inventory"
               className={cn(
                 "transition-colors hover:text-foreground/80",
-                pathname === "/alle-items" || (pathname && pathname.startsWith("/inventory")) ? "text-foreground" : "text-foreground/60"
+                pathname === "/inventory" ? "text-foreground" : "text-foreground/60"
               )}
             >
               Inventory
