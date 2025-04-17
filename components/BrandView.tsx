@@ -19,6 +19,7 @@ interface BrandViewProps {
   setPromoters: (promoters: any[]) => void;
   promoterItems: any[];
   setPromoterItems: (items: any[]) => void;
+  triggerRefresh: () => void;
 }
 
 export default function BrandView({
@@ -29,7 +30,8 @@ export default function BrandView({
   promoters, 
   setPromoters, 
   promoterItems,
-  setPromoterItems
+  setPromoterItems,
+  triggerRefresh
 }: BrandViewProps) {
   const [showAddBrandDialog, setShowAddBrandDialog] = useState(false)
   const [showAddItemDialog, setShowAddItemDialog] = useState(false)
@@ -45,6 +47,11 @@ export default function BrandView({
     router.push('/inventory');
   };
   
+  const handleBrandUpdated = () => {
+    refreshBrands();
+    triggerRefresh();
+  };
+  
   return (
     <>
       {selectedBrand ? (
@@ -54,6 +61,7 @@ export default function BrandView({
             <Button onClick={() => setShowAddItemDialog(true)}>Neuer Artikel</Button>
           </div>
           <ItemList
+            key={selectedBrand.id}
             brandId={selectedBrand.id}
             selectedItem={selectedItem}
             setSelectedItem={setSelectedItem}
@@ -61,6 +69,7 @@ export default function BrandView({
             setPromoters={setPromoters}
             promoterItems={promoterItems}
             setPromoterItems={setPromoterItems}
+            triggerRefresh={triggerRefresh}
           />
         </>
       ) : (
@@ -80,7 +89,7 @@ export default function BrandView({
                 setSelectedBrand(brand);
               }
             }}
-            onBrandUpdated={refreshBrands}
+            onBrandUpdated={handleBrandUpdated}
             onEditBrand={setEditingBrand}
           />
         </>

@@ -32,6 +32,7 @@ interface ItemListProps {
   setPromoters: (promoters: Promoter[]) => void;
   promoterItems: any[];
   setPromoterItems: (items: any[]) => void;
+  triggerRefresh: () => void;
 }
 
 export default function ItemList({ 
@@ -41,7 +42,8 @@ export default function ItemList({
   promoters, 
   setPromoters, 
   promoterItems, 
-  setPromoterItems
+  setPromoterItems,
+  triggerRefresh
 }: ItemListProps) {
   const { currentUser } = useUser();
   const { toast } = useToast();
@@ -293,27 +295,24 @@ export default function ItemList({
     setShowHistoryDialog(true);
   }
 
-  const handleTransactionSuccess = () => {
-    // Prevent multiple refreshes in quick succession
+  const handleTransactionSuccess = useCallback(async () => {
     if (isRefreshing) {
       console.log('ItemList - Refresh already in progress, skipping');
       return;
     }
-
     console.log('ItemList - handleTransactionSuccess called');
-    console.log('ItemList - Before refreshItems');
-    
     setIsRefreshing(true);
-    refreshItems()
-      .then(() => {
-        console.log('ItemList - After refreshItems');
+    try {
+      console.log('ItemList - Before refreshItems');
+      await refreshItems();
+      console.log('ItemList - After refreshItems, calling triggerRefresh');
+      triggerRefresh();
+    } catch (error) {
+        console.error('ItemList - Error during refreshItems:', error);
+    } finally {
         setIsRefreshing(false);
-      })
-      .catch(error => {
-        console.error('ItemList - Error refreshing items:', error);
-        setIsRefreshing(false);
-      });
-  };
+    }
+  }, [isRefreshing, refreshItems, triggerRefresh]);
 
   // Handle quantity change for an item in mass edit mode
   const handleMassEditQuantityChange = (itemId: string, quantity: number) => {
@@ -420,10 +419,9 @@ export default function ItemList({
       }
 
       // --- Reset and Refresh --- 
-      setItemQuantities({}); // Reset quantities regardless of partial failure
-      // Refresh items only after all promises are settled
+      setItemQuantities({}); 
       console.log("[Mass Edit] Calling handleTransactionSuccess after all promises settled.");
-      handleTransactionSuccess(); 
+      await handleTransactionSuccess(); 
 
     } catch (error) {
       // This catch block might be less likely to trigger with Promise.allSettled, 

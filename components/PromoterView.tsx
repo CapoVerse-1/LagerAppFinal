@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from "@/components/ui/button"
 import { Plus, Loader2 } from 'lucide-react'
 import PromoterList from './PromoterList'
@@ -22,6 +22,8 @@ interface PromoterViewProps {
   setItems: (items: any[]) => void;
   transactionHistory: Record<string, any[]>;
   setTransactionHistory: (history: Record<string, any[]>) => void;
+  refreshKey: number;
+  promoters: PromoterWithDetails[];
 }
 
 interface SimplePromoter {
@@ -32,6 +34,7 @@ interface SimplePromoter {
   clothing_size?: string;
   is_active: boolean;
   transactionCount?: number;
+  address?: string;
 }
 
 export default function PromoterView({
@@ -44,7 +47,9 @@ export default function PromoterView({
   items,
   setItems,
   transactionHistory,
-  setTransactionHistory
+  setTransactionHistory,
+  refreshKey,
+  promoters
 }: PromoterViewProps) {
   const [showAddPromoterDialog, setShowAddPromoterDialog] = useState(false)
   const [editingPromoter, setEditingPromoter] = useState<PromoterWithDetails | null>(null)
@@ -52,27 +57,29 @@ export default function PromoterView({
   const [promoterInventory, setPromoterInventory] = useState<any[]>([])
   const router = useRouter();
   
-  const { promoters, loading: promotersLoading, refreshPromoters, updatePromoterDetails } = usePromoters();
+  const { refreshPromoters } = usePromoters();
   
-  useEffect(() => {
-    const loadPromoterInventory = async () => {
-      if (selectedPromoter) {
-        setInventoryLoading(true);
-        try {
-          const inventory = await getPromoterInventory(selectedPromoter.id);
-          setPromoterInventory(inventory);
-        } catch (error) {
-          console.error('Error loading promoter inventory:', error);
-        } finally {
-          setInventoryLoading(false);
-        }
-      } else {
+  const loadAndSetPromoterInventory = useCallback(async () => {
+    if (selectedPromoter?.id) {
+      console.log(`[PromoterView] Loading inventory for ${selectedPromoter.id} due to change or refreshKey.`);
+      setInventoryLoading(true);
+      try {
+        const inventory = await getPromoterInventory(selectedPromoter.id);
+        setPromoterInventory(inventory);
+      } catch (error) {
+        console.error('Error loading promoter inventory:', error);
         setPromoterInventory([]);
+      } finally {
+        setInventoryLoading(false);
       }
-    };
-
-    loadPromoterInventory();
+    } else {
+      setPromoterInventory([]);
+    }
   }, [selectedPromoter]);
+
+  useEffect(() => {
+    loadAndSetPromoterInventory();
+  }, [selectedPromoter, refreshKey, loadAndSetPromoterInventory]);
 
   const handleBackToPromoters = () => {
     setSelectedPromoter(null);
@@ -98,6 +105,18 @@ export default function PromoterView({
     refreshPromoters();
   };
   
+  // Map ONLY for PromoterList
+  const simplePromoters: SimplePromoter[] = promoters.map(p => ({
+      id: p.id,
+      name: p.name,
+      photo_url: p.photo_url || undefined,
+      phone_number: p.phone_number || undefined,
+      clothing_size: p.clothing_size || undefined,
+      address: p.address || undefined, 
+      is_active: p.is_active,
+      transactionCount: p.transactionCount // Assuming transactionCount exists
+  }));
+
   return (
     <>
       {selectedPromoter ? (
@@ -160,21 +179,12 @@ export default function PromoterView({
                     brand: item.item.brands?.name || 'Unknown',
                     promoterId: selectedPromoter.id
                   }))}
-                  setPromoterItems={setPromoterItems}
+                  setPromoterItems={() => {}}
                   selectedItem={selectedItem}
                   setSelectedItem={setSelectedItem}
                   items={items}
                   setItems={setItems}
-                  promoters={promoters.map(p => ({
-                    id: p.id,
-                    name: p.name,
-                    photo_url: p.photo_url || undefined,
-                    phone_number: p.phone_number || undefined,
-                    clothing_size: p.clothing_size || undefined,
-                    address: p.address || undefined,
-                    is_active: p.is_active,
-                    transactionCount: p.transactionCount
-                  }))}
+                  promoters={simplePromoters}
                   setPromoters={() => refreshPromoters()}
                   transactionHistory={transactionHistory}
                   setTransactionHistory={setTransactionHistory}
@@ -203,16 +213,7 @@ export default function PromoterView({
             </Button>
           </div>
           <PromoterList
-            promoters={promoters.map(p => ({
-              id: p.id,
-              name: p.name,
-              photo_url: p.photo_url || undefined,
-              phone_number: p.phone_number || undefined,
-              clothing_size: p.clothing_size || undefined,
-              address: p.address || undefined,
-              is_active: p.is_active,
-              transactionCount: p.transactionCount
-            }))}
+            promoters={simplePromoters}
             onPromoterUpdated={handleUpdatePromoter}
             onPromoterClick={(promoter) => {
               const fullPromoter = promoters.find(p => p.id === promoter.id);
