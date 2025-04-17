@@ -20,7 +20,7 @@ export default function Header() {
             </span>
           </Link>
           <nav className="flex items-center space-x-6 text-sm font-medium">
-            <Link
+            <a
               href="/alle-items"
               className={cn(
                 "transition-colors hover:text-foreground/80",
@@ -28,7 +28,7 @@ export default function Header() {
               )}
             >
               Inventory
-            </Link>
+            </a>
             <Link
               href="/transactions"
               className={cn(
