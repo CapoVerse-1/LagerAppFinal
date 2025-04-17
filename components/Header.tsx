@@ -42,9 +42,8 @@ export default function Header() {
             <Link
               href="/alle-items"
               className={cn(
-                "transition-colors hover:text-foreground/80",
-                pathname === "/alle-items" ? "text-foreground" : "text-foreground/60",
-                "bg-red-200 border border-red-500"
+                "transition-colors hover:text-foreground/80 flex items-center",
+                pathname === "/alle-items" ? "text-foreground" : "text-foreground/60"
               )}
             >
               Alle Items
