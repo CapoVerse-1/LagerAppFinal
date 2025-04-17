@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import { ProfileMenu } from "./ProfileMenu";
 import { History } from "lucide-react";
 import SearchBar from "./SearchBar";
-import { Button } from "@/components/ui/button";
 
 export default function Header() {
   const pathname = usePathname();
@@ -20,7 +19,7 @@ export default function Header() {
               JTI Inventory Management
             </span>
           </Link>
-          <nav className="flex items-center space-x-6 text-sm font-medium">
+          <nav className="hidden sm:flex items-center space-x-6 text-sm font-medium">
             <Link
               href="/inventory"
               className={cn(
@@ -40,17 +39,21 @@ export default function Header() {
               <History className="mr-1 h-4 w-4" />
               Transaktionen
             </Link>
+            <Link
+              href="/alle-items"
+              className={cn(
+                "transition-colors hover:text-foreground/80",
+                pathname === "/alle-items" ? "text-foreground" : "text-foreground/60"
+              )}
+            >
+              Alle Items
+            </Link>
           </nav>
         </div>
         <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
           <div className="w-full max-w-md mr-4">
             <SearchBar />
           </div>
-          <Link href="/alle-items" passHref>
-            <Button variant="outline" size="sm">
-              Alle Items
-            </Button>
-          </Link>
           <ProfileMenu />
         </div>
       </div>
