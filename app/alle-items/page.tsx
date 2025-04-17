@@ -87,22 +87,33 @@ export default function AlleItemsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {items.map((item) => (
-            <Card key={item.id} className="overflow-hidden">
-              <CardHeader>
-                <CardTitle className="text-lg">{item.name || 'Unbenannter Artikel'}</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground space-y-1">
-                {/* Display calculated quantities */} 
-                {item.quantities ? (
-                  <>
-                    <p>Original: <Badge variant="secondary">{item.quantities.originalQuantity}</Badge></p>
-                    <p>Available: <Badge variant="outline">{item.quantities.availableQuantity}</Badge></p>
-                    <p>In Circulation: <Badge variant="outline">{item.quantities.inCirculation}</Badge></p>
-                    <p>Total: <Badge variant="default">{item.quantities.totalQuantity}</Badge></p>
-                  </>
-                ) : (
-                  <p>Mengen konnten nicht geladen werden.</p>
-                )}
+            <Card key={item.id} className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:scale-[1.02] hover:border-primary">
+              <CardContent className="p-0">
+                 <div className="p-4">
+                   <h3 className="font-semibold text-lg truncate mb-4">{item.name || 'Unbenannter Artikel'}</h3>
+                   {item.quantities ? (
+                     <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                       <div>
+                         <p className="text-muted-foreground">Original:</p>
+                         <p>{item.quantities.originalQuantity}</p>
+                       </div>
+                       <div>
+                         <p className="text-muted-foreground">Available:</p>
+                         <p className="font-medium">{item.quantities.availableQuantity}</p>
+                       </div>
+                       <div>
+                         <p className="text-muted-foreground">In Circulation:</p>
+                         <p>{item.quantities.inCirculation}</p>
+                       </div>
+                       <div>
+                         <p className="text-muted-foreground">Total:</p>
+                         <p className="font-medium">{item.quantities.totalQuantity}</p>
+                       </div>
+                     </div>
+                   ) : (
+                     <p className="text-sm text-muted-foreground">Mengen konnten nicht geladen werden.</p>
+                   )}
+                 </div>
               </CardContent>
             </Card>
           ))}
