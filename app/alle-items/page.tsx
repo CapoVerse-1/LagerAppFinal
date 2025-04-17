@@ -6,6 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Database } from '@/types/supabase';
 import { calculateItemQuantities } from '@/lib/api/items';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft } from 'lucide-react';
 
 type BaseItem = Database['public']['Tables']['items']['Row'];
 type ItemQuantities = {
@@ -34,14 +37,14 @@ export default function AlleItemsPage() {
       try {
         const { data: itemData, error: itemError } = await supabase
           .from('items')
-          .select('id, name, original_quantity, is_shared')
+          .select('id, name, product_id, image_url, brand_id, is_shared, is_active, original_quantity, created_at, created_by')
           .eq('is_shared', false);
 
         if (itemError) {
           console.error('Error fetching items:', itemError);
           throw new Error('Fehler beim Laden der Artikel.');
         }
-        fetchedItems = itemData || [];
+        fetchedItems = (itemData || []) as BaseItem[];
 
         const itemsWithQuantities = await Promise.all(
           fetchedItems.map(async (item) => {
@@ -81,6 +84,15 @@ export default function AlleItemsPage() {
 
   return (
     <div className="container mx-auto p-4">
+      <div className="mb-4">
+        <Link href="/inventory">
+          <Button variant="outline">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Zurück
+          </Button>
+        </Link>
+      </div>
+
       <h1 className="text-2xl font-bold mb-4">Alle Artikel (Übersicht)</h1>
       {items.length === 0 ? (
         <p>Keine Artikel gefunden.</p>

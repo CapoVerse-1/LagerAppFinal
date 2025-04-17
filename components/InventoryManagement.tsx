@@ -23,7 +23,7 @@ import { PinProvider } from '../contexts/PinContext'
 import { useToast } from '@/hooks/use-toast'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useUser } from '@/contexts/UserContext'
-import Link from "next/link"
+import Header from "@/components/Header"
 import { usePathname, useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useBrands, BrandWithItemCount } from '@/hooks/useBrands'
@@ -47,7 +47,7 @@ export default function InventoryManagement() {
   useCurrentUser();
   const searchParams = useSearchParams();
   const { promoters: fetchedPromotersList, refreshPromoters } = usePromoters();
-  const { items: fetchedItemsList, refreshItems: refreshItemsHook } = useItems(selectedBrand?.id);
+  const { items: fetchedItemsList, refreshItems: refreshItemsHook } = useItems(selectedBrand?.id ?? '');
   const { brands: fetchedBrandsList, refreshBrands } = useBrands();
 
   const [importedData, setImportedData] = useState(null)
@@ -117,47 +117,9 @@ export default function InventoryManagement() {
 
   return (
       <div className={`container mx-auto p-4 ${styles.container}`}>
-        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 mb-4">
-          <div className="container flex h-14 items-center">
-            <div className="mr-4 hidden md:flex">
-              <Link href="/" className="mr-6 flex items-center space-x-2">
-                <span className="hidden font-bold sm:inline-block">
-                  JTI Inventory Management
-                </span>
-              </Link>
-              <nav className="flex items-center space-x-6 text-sm font-medium">
-                <Link
-                  href="/inventory"
-                  className={cn(
-                    "transition-colors hover:text-foreground/80",
-                    usePathname() === "/inventory" ? "text-foreground" : "text-foreground/60"
-                  )}
-                >
-                  Inventory
-                </Link>
-                <Link
-                  href="/transactions"
-                  className={cn(
-                    "transition-colors hover:text-foreground/80 flex items-center",
-                    usePathname() === "/transactions" ? "text-foreground" : "text-foreground/60"
-                  )}
-                >
-                  <History className="mr-1 h-4 w-4" />
-                  Transaktionen
-                </Link>
-              </nav>
-            </div>
-            <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
-              <div className="flex items-center space-x-2">
-                <ExportDialog />
-                <ImportDialog />
-              </div>
-              <ProfileMenu />
-            </div>
-          </div>
-        </header>
+        <Header />
 
-        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-center mt-6 mb-6 gap-4">
           <div className="flex items-center space-x-2 md:w-1/3">
             <Button
               variant={viewMode === 'brands' ? 'default' : 'outline'}
@@ -179,10 +141,6 @@ export default function InventoryManagement() {
               <History className="mr-2 h-4 w-4" />
               Promotoren
             </Button>
-          </div>
-          
-          <div className="flex justify-center md:w-1/3">
-            <SearchBar />
           </div>
           
           <div className="flex justify-end md:w-1/3">
@@ -220,23 +178,26 @@ export default function InventoryManagement() {
 
         {showConfirmDialog && (
           <ExportDialog
-            onClose={() => setShowConfirmDialog(false)}
+            // onClose={() => setShowConfirmDialog(false)}
           />
         )}
 
         {showRestockSearchDialog && (
           <RestockSearchDialog
-            onClose={() => setShowRestockSearchDialog(false)}
+            // onClose={() => setShowRestockSearchDialog(false)}
+            showDialog={showRestockSearchDialog}
+            setShowDialog={setShowRestockSearchDialog}
+            onSearch={handleRestockSearch}
             onSelect={handleRestockSelect}
-            items={items}
           />
         )}
 
         {showRestockQuantityDialog && selectedRestockItem && (
           <RestockQuantityDialog
             item={selectedRestockItem}
-            onClose={() => setShowRestockQuantityDialog(false)}
-            onConfirm={handleRestockConfirm}
+            showDialog={showRestockQuantityDialog}
+            setShowDialog={setShowRestockQuantityDialog}
+            onSuccess={triggerRefresh}
           />
         )}
 
@@ -244,6 +205,7 @@ export default function InventoryManagement() {
           <AddBrandDialog
             showDialog={showAddBrandDialog}
             setShowDialog={setShowAddBrandDialog}
+            onSuccess={triggerRefresh}
           />
         )}
       </div>
