@@ -337,86 +337,106 @@ export default function ItemList({
     }));
   };
 
-  // Handle mass edit confirmation
+  // Refactored mass edit confirmation handler
   const handleMassEditConfirm = async () => {
+    // --- Validation --- 
     if (!selectedAction || !selectedPromoter?.id || !currentUser?.id) { 
       toast({
         title: "Error",
-        description: "Please select an action, a promoter, and ensure you are logged in.",
+        description: "Aktion, Promoter und Mitarbeiter müssen ausgewählt sein.",
         variant: "destructive",
       });
       return;
     }
+    const itemsToProcess = Object.entries(itemQuantities)
+                             .filter(([_, { quantity }]) => quantity > 0)
+                             .map(([itemId, data]) => ({ itemId, ...data }));
 
+    if (itemsToProcess.length === 0) {
+      toast({ title: "Info", description: "Keine Artikel mit Menge größer Null ausgewählt." });
+      return;
+    }
+
+    console.log("[Mass Edit] Starting confirmation", { selectedAction, selectedPromoter, itemsToProcess });
+    setIsSubmitting(true);
     const promoterId = selectedPromoter.id; 
     const employeeId = currentUser.id;
-
-    setIsSubmitting(true);
-    let successCount = 0;
-    let errorCount = 0;
-
-    try {
-      for (const itemIdInLoop in itemQuantities) {
-        const { sizeId, quantity } = itemQuantities[itemIdInLoop];
-        if (quantity <= 0) continue; // Skip items with 0 quantity
-
-        try {
-          switch (selectedAction) {
-            case 'take-out':
-              await recordTakeOut({
-                itemId: itemIdInLoop,
-                itemSizeId: sizeId,
-                quantity,
-                promoterId: promoterId,
-                employeeId: employeeId,
-                notes: `Mass edit operation`
-              });
-              break;
-            case 'return':
-              await recordReturn({
-                itemId: itemIdInLoop,
-                itemSizeId: sizeId,
-                quantity,
-                promoterId: promoterId,
-                employeeId: employeeId,
-                notes: `Mass edit operation`
-              });
-              break;
-            case 'burn':
-              await recordBurn({
-                itemId: itemIdInLoop,
-                itemSizeId: sizeId,
-                quantity,
-                promoterId: promoterId,
-                employeeId: employeeId,
-                notes: `Mass edit operation`
-              });
-              break;
-          }
-          successCount++;
-        } catch (error) {
-          console.error(`Error processing item ${itemIdInLoop}:`, error);
-          errorCount++;
-        }
+    
+    // --- Prepare Promises --- 
+    const transactionPromises = itemsToProcess.map(({ itemId, sizeId, quantity }) => {
+      const commonData = {
+        itemId: itemId,
+        itemSizeId: sizeId,
+        quantity,
+        promoterId: promoterId,
+        employeeId: employeeId,
+        notes: `Massenbearbeitung Aktion: ${selectedAction}`
+      };
+      console.log(`[Mass Edit] Preparing ${selectedAction} for item ${itemId}, size ${sizeId}, quantity ${quantity}`);
+      switch (selectedAction) {
+        case 'take-out':
+          return recordTakeOut(commonData);
+        case 'return':
+          return recordReturn(commonData);
+        case 'burn':
+          return recordBurn(commonData);
+        default:
+          // Should not happen due to validation, but return a rejected promise just in case
+          return Promise.reject(new Error(`Unbekannte Aktion: ${selectedAction}`)); 
       }
+    });
 
-      toast({
-        title: "Success",
-        description: `Successfully processed ${successCount} items. ${errorCount} items encountered errors.`,
+    // --- Execute Promises --- 
+    try {
+      console.log(`[Mass Edit] Executing ${transactionPromises.length} promises...`);
+      const results = await Promise.allSettled(transactionPromises);
+      console.log("[Mass Edit] Promise results:", results);
+
+      let successCount = 0;
+      let errorCount = 0;
+      results.forEach((result, index) => {
+        const itemInfo = itemsToProcess[index];
+        if (result.status === 'fulfilled') {
+          successCount++;
+          console.log(`[Mass Edit] Success for item ${itemInfo.itemId}`);
+        } else {
+          errorCount++;
+          console.error(`[Mass Edit] Error for item ${itemInfo.itemId}:`, result.reason);
+        }
       });
 
-      // Reset state
-      setItemQuantities({});
-      handleTransactionSuccess();
+      // --- Report Results --- 
+      if (errorCount > 0) {
+        toast({
+          title: "Teilweise erfolgreich",
+          description: `${successCount} Artikel erfolgreich verarbeitet. ${errorCount} Artikel fehlgeschlagen. Details siehe Konsole.`,
+          variant: errorCount === itemsToProcess.length ? "destructive" : "default", // Destructive only if all failed
+        });
+      } else {
+        toast({
+          title: "Erfolg",
+          description: `${successCount} Artikel erfolgreich verarbeitet.`,
+        });
+      }
+
+      // --- Reset and Refresh --- 
+      setItemQuantities({}); // Reset quantities regardless of partial failure
+      // Refresh items only after all promises are settled
+      console.log("[Mass Edit] Calling handleTransactionSuccess after all promises settled.");
+      handleTransactionSuccess(); 
+
     } catch (error) {
-      console.error("Error in mass edit:", error);
+      // This catch block might be less likely to trigger with Promise.allSettled, 
+      // but good practice to keep it.
+      console.error("[Mass Edit] Unexpected error during Promise.allSettled or subsequent logic:", error);
       toast({
-        title: "Error",
-        description: "Failed to process some items. Please try again.",
+        title: "Schwerwiegender Fehler",
+        description: "Ein unerwarteter Fehler ist bei der Massenbearbeitung aufgetreten.",
         variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
+      console.log("[Mass Edit] Finished confirmation process.");
     }
   };
 
