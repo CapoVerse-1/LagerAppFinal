@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast'
 import { recordBurn } from '@/lib/api/transactions'
 import { fetchItemSizes, ItemSize } from '@/lib/api/items'
 import PromoterSelector from './PromoterSelector'
+import { Promoter } from '@/lib/api/promoters'
 
 interface BurnItemDialogProps {
   item: any;
@@ -55,6 +56,13 @@ export default function BurnItemDialog({
     
     fetchSizes();
   }, [item, toast]);
+
+  // Update handler to accept Promoter object and extract ID
+  const handlePromoterChange = (promoter: Promoter | null) => {
+    const id = promoter?.id || "";
+    console.log('BurnItemDialog - Promoter changed to:', id, promoter);
+    setPromoterId(id);
+  };
 
   const handleConfirmBurn = async () => {
     console.log('BurnItemDialog - handleConfirmBurn called');
@@ -111,9 +119,10 @@ export default function BurnItemDialog({
       setBurningItem(null);
     } catch (error) {
       console.error("Error burning item:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to burn item. Please try again.";
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to burn item. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -180,8 +189,9 @@ export default function BurnItemDialog({
             <div className="col-span-3">
               <PromoterSelector 
                 value={promoterId} 
-                onChange={setPromoterId} 
+                onChange={handlePromoterChange} 
                 placeholder="Promoter auswählen"
+                includeInactive={true}
               />
             </div>
           </div>

@@ -10,6 +10,7 @@ import { fetchItemSizes } from '@/lib/api/items';
 import { useUser } from '../contexts/UserContext';
 import PromoterSelector from './PromoterSelector';
 import { supabase } from '@/lib/supabase';
+import { Promoter } from '@/lib/api/promoters';
 
 interface TakeOutDialogProps {
   item: any;
@@ -72,12 +73,23 @@ export default function TakeOutDialog({
     });
   }, [promoterId, sizeId, quantity, isSubmitting]);
 
-  const handlePromoterId = (id: string) => {
-    console.log('Promoter ID changed to:', id);
+  // Update handler to accept Promoter object and extract ID
+  const handlePromoterChange = (promoter: Promoter | null) => {
+    const id = promoter?.id || "";
+    console.log('TakeOutDialog - Promoter changed to:', id, promoter);
     setPromoterId(id);
   };
 
   const handleConfirmTakeOut = async () => {
+    if (!currentUser?.id) {
+      toast({
+        title: "Error",
+        description: "No employee selected. Please select an employee first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (!item || !sizeId || !promoterId || quantity <= 0) {
       console.log('Validation failed:', { item, sizeId, promoterId, quantity });
       toast({
@@ -115,7 +127,7 @@ export default function TakeOutDialog({
         itemSizeId: sizeId,
         quantity: quantity,
         promoterId: promoterId,
-        employeeId: currentUser?.id,
+        employeeId: currentUser.id,
         notes: notes
       });
       
@@ -146,9 +158,10 @@ export default function TakeOutDialog({
       setTakingOutItem(null);
     } catch (error) {
       console.error("Error taking out item:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to take out item. Please try again.";
       toast({
         title: "Error",
-        description: error.message || "Failed to take out item. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -214,8 +227,8 @@ export default function TakeOutDialog({
             <Label htmlFor="takeOutPromoter" className="text-right">Promoter</Label>
             <div className="col-span-3">
               <PromoterSelector 
-                value={promoterId} 
-                onChange={handlePromoterId} 
+                value={promoterId}
+                onChange={handlePromoterChange}
                 placeholder="Promoter auswählen"
                 includeInactive={false}
               />

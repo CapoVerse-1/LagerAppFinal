@@ -13,6 +13,7 @@ import PromoterSelector from './PromoterSelector';
 import { supabase } from '@/lib/supabase';
 import ReturnWarningDialog from './ReturnWarningDialog';
 import { Loader2 } from 'lucide-react'; // Import Loader
+import { Promoter } from '@/lib/api/promoters'; // Ensure Promoter type is imported
 
 // Define PromoterItem type (adjust based on actual structure if different)
 interface PromoterItem {
@@ -90,8 +91,10 @@ export default function ReturnDialog({
     });
   }, [promoterId, sizeId, quantity, isSubmitting]);
 
-  const handlePromoterId = (id: string) => {
-    console.log('Promoter ID changed to:', id);
+  // Renamed handler to handlePromoterChange
+  const handlePromoterChange = (promoter: Promoter | null) => {
+    const id = promoter?.id || "";
+    console.log('ReturnDialog - Promoter changed to:', id, promoter);
     setPromoterId(id);
   };
 
@@ -178,6 +181,16 @@ export default function ReturnDialog({
 
   // Initial confirmation handler - performs check first
   const handleConfirmReturn = async () => {
+    // Add check for currentUser before proceeding
+    if (!currentUser?.id) {
+      toast({
+        title: "Error",
+        description: "No employee selected. Please select an employee first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (!item || !sizeId || !promoterId || quantity <= 0) {
       toast({
         title: "Error",
@@ -297,7 +310,7 @@ export default function ReturnDialog({
                 <div className="col-span-3">
                   <PromoterSelector 
                     value={promoterId} 
-                    onChange={handlePromoterId} 
+                    onChange={handlePromoterChange} 
                     placeholder="Promoter auswählen"
                     includeInactive={true}
                   />
