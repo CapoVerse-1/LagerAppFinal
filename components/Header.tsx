@@ -19,7 +19,7 @@ export default function Header() {
               JTI Inventory Management
             </span>
           </Link>
-          <nav className="hidden sm:flex items-center space-x-6 text-sm font-medium">
+          <nav className="flex items-center space-x-6 text-sm font-medium">
             <Link
               href="/inventory"
               className={cn(
