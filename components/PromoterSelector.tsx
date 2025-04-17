@@ -83,35 +83,37 @@ export default function PromoterSelector({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[300px] p-0 overflow-hidden">
-          <Command className="p-0">
+          <Command>
             {loading ? (
               <div className="py-6 text-center">
                 <Spinner className="mx-auto" />
               </div>
             ) : (
               <>
-                <CommandEmpty>
-                  {/* Empty content, no message shown */}
-                </CommandEmpty>
-                {/* Add max-height and overflow for scrolling */}
-                <CommandGroup className="max-h-[250px] overflow-y-auto p-1">
+                <CommandGroup className="max-h-[250px] overflow-y-auto">
                   {filteredPromoters.map((promoter) => (
-                    <div 
+                    <CommandItem
                       key={promoter.id}
+                      value={promoter.id}
+                      onSelect={(currentValue) => {
+                        onChange(currentValue);
+                        setOpen(false);
+                      }}
                       className={cn(
-                        "flex items-center px-2 py-1.5 text-sm rounded-sm cursor-pointer hover:bg-accent hover:text-accent-foreground",
+                        "flex items-center justify-between w-full",
                         !promoter.is_active ? "opacity-70" : ""
                       )}
-                      onClick={() => handleSelectPromoter(promoter.id)}
                     >
+                      <span>
+                        {promoter.name} {!promoter.is_active && " (Inaktiv)"}
+                      </span>
                       <Check
                         className={cn(
-                          "mr-2 h-4 w-4",
+                          "h-4 w-4",
                           value === promoter.id ? "opacity-100" : "opacity-0"
                         )}
                       />
-                      {promoter.name} {!promoter.is_active && " (Inaktiv)"}
-                    </div>
+                    </CommandItem>
                   ))}
                 </CommandGroup>
               </>
