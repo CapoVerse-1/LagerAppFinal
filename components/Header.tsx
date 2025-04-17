@@ -39,6 +39,15 @@ export default function Header() {
               <History className="mr-1 h-4 w-4" />
               Transaktionen
             </Link>
+            <Link
+              href="/alle-items"
+              className={cn(
+                "transition-colors hover:text-foreground/80",
+                pathname === "/alle-items" ? "text-foreground" : "text-foreground/60"
+              )}
+            >
+              Alle Items
+            </Link>
           </nav>
         </div>
         <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
