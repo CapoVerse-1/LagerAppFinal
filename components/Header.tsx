@@ -20,15 +20,15 @@ export default function Header() {
             </span>
           </Link>
           <nav className="flex items-center space-x-6 text-sm font-medium">
-            <a
+            <Link
               href="/alle-items"
               className={cn(
                 "transition-colors hover:text-foreground/80",
-                pathname === "/inventory" || pathname === "/alle-items" ? "text-foreground" : "text-foreground/60"
+                pathname === "/alle-items" || (pathname && pathname.startsWith("/inventory")) ? "text-foreground" : "text-foreground/60"
               )}
             >
               Inventory
-            </a>
+            </Link>
             <Link
               href="/transactions"
               className={cn(
@@ -38,6 +38,15 @@ export default function Header() {
             >
               <History className="mr-1 h-4 w-4" />
               Transaktionen
+            </Link>
+            <Link
+              href="/alle-items"
+              className={cn(
+                "transition-colors hover:text-foreground/80",
+                pathname === "/alle-items" ? "text-foreground" : "text-foreground/60"
+              )}
+            >
+              Alle Items
             </Link>
           </nav>
         </div>
