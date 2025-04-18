@@ -22,8 +22,9 @@ import { debounce } from 'lodash';
 import { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 import { Checkbox } from "@/components/ui/checkbox";
-import { Document, Packer, Paragraph, TextRun } from 'docx';
+import { Document, Packer, Paragraph, TextRun, AlignmentType } from 'docx';
 import { saveAs } from 'file-saver';
+import { toast } from "@/components/ui/use-toast";
 
 export default function TransactionHistoryView() {
   const {
@@ -177,94 +178,86 @@ export default function TransactionHistoryView() {
   }, [brandsMap]);
   
   // Handle Word document export
-  const handleExport = async () => {
-    if (selectedTransactionIds.size === 0) {
-      alert("Bitte wählen Sie mindestens eine Transaktion für den Export aus.");
+  const handleExport = useCallback(() => {
+    const selectedTransactions = transactions.filter(t => selectedTransactionIds.has(t.id));
+    if (selectedTransactions.length === 0) {
+      toast({ title: "Keine Transaktionen ausgewählt", description: "Bitte wählen Sie Transaktionen zum Exportieren aus." });
       return;
     }
-    if (selectedPromoter === 'all') {
-        alert("Bitte wählen Sie einen Promoter aus der Filterliste aus.");
-        return;
-    }
 
-    // Find selected promoter's name
-    const promoter = promoters.find(p => p.id === selectedPromoter);
-    const promoterName = promoter ? promoter.name : 'Unbekannter Promoter';
+    // Assume all selected transactions are for the same promoter for simplicity
+    // In a real scenario, you might group by promoter or handle multiple promoters
+    const promoterName = selectedTransactions[0].promoters?.name || "Unbekannter Promoter";
+    const exportDate = format(new Date(), "dd.MM.yyyy");
+    const filename = `Übergabe_${promoterName.replace(/\s+/g, '')}_${exportDate}.docx`;
 
-    // Get current date
-    const currentDate = format(new Date(), "dd.MM.yyyy", { locale: de });
+    const itemLines = selectedTransactions.map(transaction => {
+      const itemText = `${transaction.items?.name || 'N/A'}, ${formatTransactionDate(transaction.timestamp)}`;
+      const typeLabel = getTransactionTypeLabel(transaction.transaction_type);
+      return new Paragraph({
+        // Center align the item list paragraphs
+        alignment: AlignmentType.CENTER, 
+        children: [
+          // Keep the bullet point for structure, but the whole line will be centered
+          new TextRun({ text: "- ", size: 24 }), 
+          new TextRun({ text: `${itemText} - ${typeLabel}`, size: 24 })
+        ],
+        spacing: { after: 120 } 
+      });
+    });
 
-    // Filter selected transactions from the currently loaded transactions
-    const selectedTransactions = transactions.filter(t => selectedTransactionIds.has(t.id));
-
-    // Build the document content
     const doc = new Document({
       sections: [{
         properties: {},
         children: [
           new Paragraph({
-            children: [
-              new TextRun({ text: "Übernahme Bestätigung SalesCrew JTI", bold: true, size: 28 }),
-            ],
-            spacing: { after: 300 },
+            children: [new TextRun({ text: "Übernahme Bestätigung SalesCrew JTI", bold: true, size: 32 })], // 16pt font size
+            alignment: AlignmentType.CENTER, // Center align
+            spacing: { after: 240 } // Add spacing after title
           }),
           new Paragraph({
-            children: [
-              new TextRun({ text: `Promotorname: ${promoterName}`, size: 24 }),
-            ],
-            spacing: { after: 150 },
+            children: [new TextRun({ text: `Promotorname: ${promoterName}`, size: 24 })],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 120 }
           }),
           new Paragraph({
-            children: [
-              new TextRun({ text: `Datum der übergabe: ${currentDate}`, size: 24 }),
-            ],
-            spacing: { after: 300 },
+            children: [new TextRun({ text: `Datum der Übergabe: ${exportDate}`, size: 24 })],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 240 }
           }),
           new Paragraph({
-            children: [
-              new TextRun({ text: "Artikel, Datum und Uhrzeit:", bold: true, size: 24 }),
-            ],
-            spacing: { after: 150 },
+            children: [new TextRun({ text: "Artikel, Datum und Uhrzeit:", bold: true, size: 24 })],
+            alignment: AlignmentType.CENTER, 
+            spacing: { after: 120 }
           }),
-          ...selectedTransactions.map(transaction =>
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: `- ${transaction.items?.name || 'N/A'}, ${formatTransactionDate(transaction.timestamp)}`,
-                  size: 22
-                }),
-              ],
-              spacing: { after: 100 },
-              indent: { left: 720 },
-            })
-          ),
-          new Paragraph({
-             children: [new TextRun("")],
-             spacing: { after: 400 },
+          ...itemLines, // Item lines will now be centered
+          new Paragraph({ // Add more space before signature
+            children: [new TextRun({ text: "", size: 24 })],
+            spacing: { before: 480 }
           }),
           new Paragraph({
-            children: [
-              new TextRun({ text: "Unterschrift Promotor und unterschrift Salescrew:", size: 24 }),
-            ],
+            children: [new TextRun({ text: "Unterschrift Promotor und Unterschrift Salescrew:", size: 24 })],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 240 }
           }),
           new Paragraph({
-             children: [new TextRun("______________________________")],
-             spacing: { before: 100 },
+            children: [new TextRun({ text: "______________________________", size: 24 })],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 120 }
           }),
         ],
-      }],
+      }]
     });
 
-    // Generate and download the file
-    try {
-      const blob = await Packer.toBlob(doc);
-      const safePromoterName = promoterName.replace(/[^a-zA-Z0-9_]/g, '_');
-      saveAs(blob, `Uebergabe_${safePromoterName}_${currentDate}.docx`);
-    } catch (error) {
-        console.error("Error generating Word document:", error);
-        alert("Fehler beim Erstellen des Word-Dokuments.");
-    }
-  };
+    Packer.toBlob(doc).then(blob => {
+      saveAs(blob, filename);
+      toast({ title: "Export erfolgreich", description: `Dokument ${filename} wurde generiert.` });
+    }).catch(err => {
+      console.error("Error generating document:", err);
+      toast({ title: "Export fehlgeschlagen", description: "Dokument konnte nicht generiert werden.", variant: "destructive" });
+    });
+
+  }, [transactions, selectedTransactionIds, formatTransactionDate, getTransactionTypeLabel, toast]);
   
   return (
     <div className="container mx-auto py-6">

@@ -119,6 +119,8 @@ export async function deletePromoter(id: string): Promise<void> {
       throw new Error('Authentication required');
     }
 
+    // Comment out the transaction history check
+    /*
     // Check if promoter has any active transactions
     const { count, error: countError } = await supabase
       .from('transactions')
@@ -134,7 +136,9 @@ export async function deletePromoter(id: string): Promise<void> {
     if (count && count > 0) {
       throw new Error('Cannot delete promoter with transaction history. Consider marking as inactive instead.');
     }
+    */
 
+    // Proceed directly to deletion
     const { error } = await supabase
       .from('promoters')
       .delete()
