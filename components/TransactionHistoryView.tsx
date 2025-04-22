@@ -182,7 +182,7 @@ export default function TransactionHistoryView() {
     const selectedTransactions = transactions.filter(t => selectedTransactionIds.has(t.id));
     if (selectedTransactions.length === 0) {
       toast({ title: "Keine Transaktionen ausgewählt", description: "Bitte wählen Sie Transaktionen zum Exportieren aus." });
-      return;
+        return;
     }
 
     // Assume all selected transactions are for the same promoter for simplicity

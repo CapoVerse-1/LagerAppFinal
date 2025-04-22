@@ -102,7 +102,8 @@ export default function AlleItemsPage() {
             <Card key={item.id} className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:scale-[1.02] hover:border-primary">
               <CardContent className="p-0">
                  <div className="p-4">
-                   <h3 className="font-semibold text-lg truncate mb-4">{item.name || 'Unbenannter Artikel'}</h3>
+                   <h3 className="font-semibold text-lg truncate mb-1">{item.name || 'Unbenannter Artikel'}</h3>
+                   <p className="text-xs text-muted-foreground truncate mb-3">ID: {item.product_id || 'N/A'}</p>
                    {item.quantities ? (
                      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                        <div>
