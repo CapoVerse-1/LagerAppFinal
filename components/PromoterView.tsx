@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Button } from "@/components/ui/button"
-import { Plus, Loader2 } from 'lucide-react'
+import { Plus, Loader2, Undo2 } from 'lucide-react'
 import PromoterList from './PromoterList'
 import PromoterItemList from './PromoterItemList'
 import AddPromoterDialog from './AddPromoterDialog'
@@ -10,6 +10,20 @@ import EditPromoterDialog from './EditPromoterDialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getPromoterInventory } from '@/lib/api/promoters'
 import PromoterHistoryDialog from './PromoterHistoryDialog'
+import { recordReturn } from '@/lib/api/transactions'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { useUser } from '@/contexts/UserContext'
+import { useToast } from '@/hooks/use-toast'
 
 interface PromoterViewProps {
   selectedPromoter: PromoterWithDetails | null;
@@ -56,7 +70,12 @@ export default function PromoterView({
   const [inventoryLoading, setInventoryLoading] = useState(false)
   const [promoterInventory, setPromoterInventory] = useState<any[]>([])
   const router = useRouter();
+  const { currentUser } = useUser();
+  const { toast } = useToast();
   
+  const [showReturnAllConfirmDialog, setShowReturnAllConfirmDialog] = useState(false);
+  const [isReturningAllItems, setIsReturningAllItems] = useState(false);
+
   const { refreshPromoters } = usePromoters();
   
   const loadAndSetPromoterInventory = useCallback(async () => {
@@ -94,6 +113,107 @@ export default function PromoterView({
     setShowHistoryDialog(true);
   };
 
+  const handleConfirmReturnAll = async () => {
+    if (!selectedPromoter || !currentUser?.id) {
+      toast({
+        title: "Fehler",
+        description: "Promoter oder Mitarbeiter nicht identifiziert. Aktion abgebrochen.",
+        variant: "destructive",
+      });
+      setShowReturnAllConfirmDialog(false);
+      return;
+    }
+
+    if (promoterInventory.length === 0) {
+      toast({
+        title: "Keine Artikel zum Zurückgeben",
+        description: "Dieser Promoter hat aktuell keine Artikel im Inventar.",
+        variant: "default",
+      });
+      setShowReturnAllConfirmDialog(false);
+      return;
+    }
+
+    setIsReturningAllItems(true);
+    setShowReturnAllConfirmDialog(false); // Close dialog once confirmed
+
+    const returnPromises = promoterInventory.map(invItem => {
+      // invItem structure based on getPromoterInventory: { item: {id, name, ...}, size: {id, size, ...}, quantity }
+      const commonData = {
+        itemId: invItem.item.id,
+        itemSizeId: invItem.size.id,
+        quantity: invItem.quantity,
+        promoterId: selectedPromoter.id,
+        employeeId: currentUser.id,
+        notes: `Automatische Rückgabe aller Artikel für ${selectedPromoter.name}`
+      };
+      return recordReturn(commonData);
+    });
+
+    try {
+      const results = await Promise.allSettled(returnPromises);
+      let successCount = 0;
+      const failedReturns: { name: string; size: string; quantity: number; reason: string }[] = [];
+
+      results.forEach((result, index) => {
+        const invItem = promoterInventory[index];
+        const itemName = invItem.item.name || `Item ID ${invItem.item.id}`;
+        const itemSize = invItem.size.size || `Size ID ${invItem.size.id}`;
+
+        if (result.status === 'fulfilled') {
+          successCount++;
+        } else {
+          const errorMessage = (result.reason instanceof Error) ? result.reason.message : String(result.reason);
+          failedReturns.push({
+            name: itemName,
+            size: itemSize,
+            quantity: invItem.quantity,
+            reason: errorMessage,
+          });
+          console.error(`Fehler bei Rückgabe von ${itemName} (${itemSize}):`, result.reason);
+        }
+      });
+
+      if (failedReturns.length > 0) {
+        const successMsg = successCount > 0 ? `${successCount} Artikel erfolgreich zurückgegeben. ` : '';
+        const failureIntro = `${failedReturns.length} Artikel konnten nicht zurückgegeben werden:`;
+        const failuresSummary = failedReturns
+          .map(f => `${f.name} (Größe: ${f.size}, Menge: ${f.quantity}): ${f.reason}`)
+          .join('; ');
+        let toastDescription = `${successMsg}${failureIntro} ${failuresSummary}`;
+        if (toastDescription.length > 250) {
+          toastDescription = toastDescription.substring(0, 247) + "... (Details in Konsole)";
+        }
+        toast({
+          title: successCount > 0 ? "Teilweise erfolgreich" : "Fehler bei der Rückgabe",
+          description: toastDescription,
+          variant: successCount === 0 ? "destructive" : "default",
+          duration: failedReturns.length > 1 ? 9000 : 6000,
+        });
+      } else {
+        toast({
+          title: "Erfolg",
+          description: `Alle ${successCount} Artikel von ${selectedPromoter.name} erfolgreich zurückgegeben.`,
+        });
+      }
+
+      // Refresh inventory
+      await loadAndSetPromoterInventory();
+      // Potentially trigger a broader refresh if other components depend on this data, e.g. using the refreshKey logic
+      // For now, only local inventory is refreshed.
+
+    } catch (error) {
+      console.error("Unerwarteter Fehler beim Zurückgeben aller Artikel:", error);
+      toast({
+        title: "Schwerwiegender Fehler",
+        description: "Ein unerwarteter Fehler ist aufgetreten.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsReturningAllItems(false);
+    }
+  };
+
   const handleEdit = (promoter: SimplePromoter) => {
     const fullPromoter = promoters.find(p => p.id === promoter.id);
     if (fullPromoter) {
@@ -124,7 +244,35 @@ export default function PromoterView({
           <div className="flex justify-between items-center mb-4">
             <Button onClick={handleBackToPromoters}>Zurück zu Promotern</Button>
             <h2 className="text-xl font-semibold">{selectedPromoter.name}</h2>
-            <Button variant="outline" onClick={handleShowHistory}>Verlauf anzeigen</Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleShowHistory} disabled={isReturningAllItems}>
+                Verlauf anzeigen
+              </Button>
+              <AlertDialog open={showReturnAllConfirmDialog} onOpenChange={setShowReturnAllConfirmDialog}>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" disabled={isReturningAllItems || inventoryLoading || promoterInventory.length === 0}>
+                    <Undo2 className="mr-2 h-4 w-4" />
+                    {isReturningAllItems ? "Wird verarbeitet..." : "Alle zurückgeben"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Alle Artikel zurückgeben?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Sind Sie sicher, dass Sie alle Artikel von {selectedPromoter.name} zurückgeben möchten? 
+                      Diese Aktion kann nicht rückgängig gemacht werden und wird für jeden Artikel eine einzelne Transaktion erstellen.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirmReturnAll} disabled={isReturningAllItems}>
+                      {isReturningAllItems ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Bestätigen
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
 
           {/* Display promoter details */}
@@ -184,7 +332,7 @@ export default function PromoterView({
                   setSelectedItem={setSelectedItem}
                   items={items}
                   setItems={setItems}
-                  promoters={simplePromoters}
+                  promoters={promoters}
                   setPromoters={() => refreshPromoters()}
                   transactionHistory={transactionHistory}
                   setTransactionHistory={setTransactionHistory}
@@ -213,12 +361,15 @@ export default function PromoterView({
             </Button>
           </div>
           <PromoterList
-            promoters={simplePromoters}
+            promoters={promoters}
             onPromoterUpdated={handleUpdatePromoter}
             onPromoterClick={(promoter) => {
               const fullPromoter = promoters.find(p => p.id === promoter.id);
               if (fullPromoter) {
                 setSelectedPromoter(fullPromoter);
+              } else {
+                const foundPromoter = promoters.find(p => p.id === promoter.id);
+                if (foundPromoter) setSelectedPromoter(foundPromoter);
               }
             }}
           />
