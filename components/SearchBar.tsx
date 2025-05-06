@@ -103,7 +103,7 @@ export default function SearchBar() {
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500 dark:text-gray-400" />
           <Input
             ref={inputRef}
-            type="search"
+            type="text"
             placeholder="Suche nach Marken, Artikeln, Promotoren..."
             className="w-full pl-9 pr-9"
             value={query}
