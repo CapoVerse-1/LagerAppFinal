@@ -392,24 +392,51 @@ export default function ItemList({
       console.log("[Mass Edit] Promise results:", results);
 
       let successCount = 0;
-      let errorCount = 0;
+      const failedItemsDetails: { name: string; quantity: number; reason: string }[] = [];
+
+      // Create a map for quick lookup of item names from the current items list
+      const itemMap = new Map(items.map(item => [item.id, item.name]));
+
       results.forEach((result, index) => {
-        const itemInfo = itemsToProcess[index];
+        const processedItemInfo = itemsToProcess[index]; // Contains itemId, sizeId, quantity
+        const itemName = itemMap.get(processedItemInfo.itemId) || `Item ID ${processedItemInfo.itemId}`;
+
         if (result.status === 'fulfilled') {
           successCount++;
-          console.log(`[Mass Edit] Success for item ${itemInfo.itemId}`);
+          console.log(`[Mass Edit] Success for item ${itemName} (ID: ${processedItemInfo.itemId})`);
         } else {
-          errorCount++;
-          console.error(`[Mass Edit] Error for item ${itemInfo.itemId}:`, result.reason);
+          console.error(`[Mass Edit] Error for item ${itemName} (ID: ${processedItemInfo.itemId}):`, result.reason);
+          const errorMessage = (result.reason instanceof Error) ? result.reason.message : String(result.reason);
+          failedItemsDetails.push({ 
+            name: itemName, 
+            quantity: processedItemInfo.quantity, 
+            reason: errorMessage 
+          });
         }
       });
 
       // --- Report Results --- 
-      if (errorCount > 0) {
+      if (failedItemsDetails.length > 0) {
+        const successMsg = successCount > 0 ? `${successCount} Artikel erfolgreich verarbeitet. ` : '';
+        const failureIntro = `${failedItemsDetails.length} Artikel fehlgeschlagen:`;
+        
+        // Create a summary of failures for the toast
+        // Example: Item A (Menge: 2): Not enough stock; Item B (Menge: 1): Network error
+        const failuresSummary = failedItemsDetails
+          .map(f => `${f.name} (Menge: ${f.quantity}): ${f.reason}`)
+          .join('; ');
+        
+        let toastDescription = `${successMsg}${failureIntro} ${failuresSummary}`;
+        // Truncate if too long for a toast, directing to console for full details
+        if (toastDescription.length > 250) {
+          toastDescription = toastDescription.substring(0, 247) + "... (Details in Konsole)";
+        }
+
         toast({
-          title: "Teilweise erfolgreich",
-          description: `${successCount} Artikel erfolgreich verarbeitet. ${errorCount} Artikel fehlgeschlagen. Details siehe Konsole.`,
-          variant: errorCount === itemsToProcess.length ? "destructive" : "default", // Destructive only if all failed
+          title: successCount > 0 && failedItemsDetails.length > 0 ? "Teilweise erfolgreich" : "Fehler bei der Massenbearbeitung",
+          description: toastDescription,
+          variant: successCount === 0 ? "destructive" : "default",
+          duration: failedItemsDetails.length > 1 ? 9000 : 6000, // Longer duration for more errors
         });
       } else {
         toast({

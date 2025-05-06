@@ -40,31 +40,37 @@ export async function recordTakeOut(data: {
       employeeId: data.employeeId
     });
 
-    // Get current quantities directly from the database
+    // Get current quantities directly from the database for logging
     const beforeQuantities = await getCurrentQuantities(data.itemSizeId);
     console.log(`Take out [${transactionTrackingId}] - Direct DB quantities before transaction:`, beforeQuantities);
 
-    // Get current item size data
+    // Get current item size data for logging
     const { data: sizeData, error: sizeError } = await supabase
       .from('item_sizes')
-      .select('*')
+      .select('available_quantity, in_circulation') // Minimal select for logging
       .eq('id', data.itemSizeId)
       .single();
 
     if (sizeError) {
-      console.error(`Take out [${transactionTrackingId}] - Error fetching item size:`, sizeError);
-      throw new Error(sizeError.message);
+      console.error(`Take out [${transactionTrackingId}] - Error fetching item size for logging:`, sizeError);
+      throw new Error(`Failed to fetch item size details: ${sizeError.message}`);
     }
 
-    console.log(`Take out [${transactionTrackingId}] - Before transaction:`, {
-      available: sizeData.available_quantity,
-      inCirculation: sizeData.in_circulation
-    });
-
-    // Check if there's enough available quantity
-    if (sizeData.available_quantity < data.quantity) {
-      throw new Error(`Not enough available items. Only ${sizeData.available_quantity} available.`);
+    if (sizeData) {
+        console.log(`Take out [${transactionTrackingId}] - Current quantities (for logging) before attempting transaction:`, {
+          available: sizeData.available_quantity,
+          inCirculation: sizeData.in_circulation
+        });
+        if (sizeData.available_quantity < data.quantity) {
+            // Log a warning, but do not throw. Database will perform the atomic check.
+            console.warn(`Take out [${transactionTrackingId}] - Client-side check indicates requested quantity ${data.quantity} may exceed available ${sizeData.available_quantity}. Database will perform final atomic check.`);
+        }
+    } else {
+        console.warn(`Take out [${transactionTrackingId}] - Could not retrieve sizeData for pre-transaction logging.`);
     }
+
+    // Intentionally removed pre-emptive throw based on client-side quantity check.
+    // Database CHECK constraints will handle this atomically during the transaction's trigger.
 
     // Create transaction record
     const transactionData: CreateTransactionData = {
@@ -93,10 +99,7 @@ export async function recordTakeOut(data: {
 
     console.log(`Take out [${transactionTrackingId}] - Transaction created:`, transaction);
 
-    // Wait a moment for the trigger to execute
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Get updated quantities directly from the database
+    // Get updated quantities directly from the database for logging
     const afterQuantities = await getCurrentQuantities(data.itemSizeId);
     console.log(`Take out [${transactionTrackingId}] - Direct DB quantities after transaction:`, afterQuantities);
     console.log(`Take out [${transactionTrackingId}] - Quantity changes:`, {
@@ -156,31 +159,36 @@ export async function recordReturn(data: {
       employeeId: data.employeeId
     });
 
-    // Get current quantities directly from the database
+    // Get current quantities directly from the database for logging
     const beforeQuantities = await getCurrentQuantities(data.itemSizeId);
     console.log(`Return [${transactionTrackingId}] - Direct DB quantities before transaction:`, beforeQuantities);
 
-    // Get current item size data
+    // Get current item size data for logging
     const { data: sizeData, error: sizeError } = await supabase
       .from('item_sizes')
-      .select('*')
+      .select('available_quantity, in_circulation') // Minimal select for logging
       .eq('id', data.itemSizeId)
       .single();
 
     if (sizeError) {
-      console.error(`Return [${transactionTrackingId}] - Error fetching item size:`, sizeError);
-      throw new Error(sizeError.message);
+      console.error(`Return [${transactionTrackingId}] - Error fetching item size for logging:`, sizeError);
+      throw new Error(`Failed to fetch item size details: ${sizeError.message}`);
     }
 
-    console.log(`Return [${transactionTrackingId}] - Before transaction:`, {
-      available: sizeData.available_quantity,
-      inCirculation: sizeData.in_circulation
-    });
-
-    // Check if there's enough in circulation
-    if (sizeData.in_circulation < data.quantity) {
-      throw new Error(`Cannot return more than in circulation. Only ${sizeData.in_circulation} in circulation.`);
+    if (sizeData) {
+        console.log(`Return [${transactionTrackingId}] - Current quantities (for logging) before attempting transaction:`, {
+          available: sizeData.available_quantity,
+          inCirculation: sizeData.in_circulation
+        });
+        if (sizeData.in_circulation < data.quantity) {
+            // Log a warning, but do not throw. Database will perform the atomic check.
+            console.warn(`Return [${transactionTrackingId}] - Client-side check indicates requested quantity ${data.quantity} may exceed in_circulation ${sizeData.in_circulation}. Database will perform final atomic check.`);
+        }
+    } else {
+        console.warn(`Return [${transactionTrackingId}] - Could not retrieve sizeData for pre-transaction logging.`);
     }
+    
+    // Intentionally removed pre-emptive throw based on client-side quantity check.
 
     // Create transaction record
     const transactionData: CreateTransactionData = {
@@ -209,10 +217,7 @@ export async function recordReturn(data: {
 
     console.log(`Return [${transactionTrackingId}] - Transaction created:`, transaction);
 
-    // Wait a moment for the trigger to execute
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Get updated quantities directly from the database
+    // Get updated quantities directly from the database for logging
     const afterQuantities = await getCurrentQuantities(data.itemSizeId);
     console.log(`Return [${transactionTrackingId}] - Direct DB quantities after transaction:`, afterQuantities);
     console.log(`Return [${transactionTrackingId}] - Quantity changes:`, {
@@ -248,7 +253,7 @@ export async function recordBurn(data: {
   itemId: string;
   itemSizeId: string;
   quantity: number;
-  promoterId: string;
+  promoterId: string; // Added promoterId for consistency, can be null if burning from main stock
   employeeId: string;
   notes?: string;
 }): Promise<Transaction> {
@@ -271,32 +276,34 @@ export async function recordBurn(data: {
       promoterId: data.promoterId,
       employeeId: data.employeeId
     });
-
-    // Get current quantities directly from the database
+    
+    // Get current quantities directly from the database for logging
     const beforeQuantities = await getCurrentQuantities(data.itemSizeId);
     console.log(`Burn [${transactionTrackingId}] - Direct DB quantities before transaction:`, beforeQuantities);
 
-    // Get current item size data
+    // Get current item size data for logging
     const { data: sizeData, error: sizeError } = await supabase
       .from('item_sizes')
-      .select('*')
+      .select('in_circulation') // Only need in_circulation for burn logging
       .eq('id', data.itemSizeId)
       .single();
 
     if (sizeError) {
-      console.error(`Burn [${transactionTrackingId}] - Error fetching item size:`, sizeError);
-      throw new Error(sizeError.message);
+      console.error(`Burn [${transactionTrackingId}] - Error fetching item size for logging:`, sizeError);
+      throw new Error(`Failed to fetch item size details: ${sizeError.message}`);
     }
 
-    console.log(`Burn [${transactionTrackingId}] - Before transaction:`, {
-      available: sizeData.available_quantity,
-      inCirculation: sizeData.in_circulation
-    });
-
-    // Check if there's enough in circulation
-    if (sizeData.in_circulation < data.quantity) {
-      throw new Error(`Cannot burn more than in circulation. Only ${sizeData.in_circulation} in circulation.`);
+    if (sizeData) {
+        console.log(`Burn [${transactionTrackingId}] - Current in_circulation (for logging) before attempting transaction: ${sizeData.in_circulation}`);
+        if (sizeData.in_circulation < data.quantity) {
+            // Log a warning, but do not throw. Database will perform the atomic check.
+            console.warn(`Burn [${transactionTrackingId}] - Client-side check indicates requested quantity ${data.quantity} may exceed in_circulation ${sizeData.in_circulation}. Database will perform final atomic check.`);
+        }
+    } else {
+        console.warn(`Burn [${transactionTrackingId}] - Could not retrieve sizeData for pre-transaction logging.`);
     }
+
+    // Intentionally removed pre-emptive throw based on client-side quantity check.
 
     // Create transaction record
     const transactionData: CreateTransactionData = {
@@ -325,10 +332,7 @@ export async function recordBurn(data: {
 
     console.log(`Burn [${transactionTrackingId}] - Transaction created:`, transaction);
 
-    // Wait a moment for the trigger to execute
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Get updated quantities directly from the database
+    // Get updated quantities directly from the database for logging
     const afterQuantities = await getCurrentQuantities(data.itemSizeId);
     console.log(`Burn [${transactionTrackingId}] - Direct DB quantities after transaction:`, afterQuantities);
     console.log(`Burn [${transactionTrackingId}] - Quantity changes:`, {
