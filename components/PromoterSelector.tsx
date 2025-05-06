@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronsUpDown, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePromoters } from '@/hooks/usePromoters';
 import { Promoter } from '@/lib/api/promoters';
@@ -27,7 +26,6 @@ export default function PromoterSelector({
   disabled = false,
   includeInactive = false
 }: PromoterSelectorProps) {
-  const [open, setOpen] = useState(false);
   const { promoters, loading, addPromoter, refreshPromoters } = usePromoters();
   
   // Debug: Log props and promoters
@@ -58,82 +56,53 @@ export default function PromoterSelector({
 
   // Handle promoter selection - find the object and pass it back
   const handleSelectPromoter = (promoterId: string) => {
+    if (!promoterId) {
+        onChange(null);
+        return;
+    }
     const foundPromoter = promoters.find(p => p.id === promoterId);
-    onChange(foundPromoter || null); // Pass the object or null
-    setOpen(false);
+    onChange(foundPromoter || null);
   };
+
+  // Find the name of the currently selected promoter for display
+  const selectedPromoterName = value ? promoters.find(p => p.id === value)?.name : null;
 
   return (
     <div className={className}>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className="w-full justify-between"
-            disabled={disabled}
-            onClick={() => console.log('Dropdown trigger clicked, disabled:', disabled)}
-          >
-            {value ? (
-              promoters.find((promoter) => promoter.id === value)?.name
+      <Select 
+        value={value || ""} 
+        onValueChange={handleSelectPromoter} 
+        disabled={disabled || loading}
+      >
+        <SelectTrigger className="w-full justify-between">
+          <SelectValue placeholder={placeholder}>
+            {selectedPromoterName || placeholder}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent position="popper" className="max-h-[250px]">
+          {loading ? (
+            <div className="py-6 text-center">
+              <Spinner className="mx-auto" />
+            </div>
+          ) : (
+            filteredPromoters.length === 0 ? (
+              <div className="px-2 py-1.5 text-sm text-muted-foreground">Keine Promoter gefunden</div>
             ) : (
-              placeholder
-            )}
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[300px] p-0 overflow-hidden">
-          <Command className="p-0">
-            {loading ? (
-              <div className="py-6 text-center">
-                <Spinner className="mx-auto" />
-              </div>
-            ) : (
-              <>
-                <CommandEmpty>
-                  {/* Empty content, no message shown */}
-                </CommandEmpty>
-                {/* Add max-height and overflow for scrolling */}
-                <CommandGroup className="max-h-[250px] overflow-y-auto p-1">
-                  {filteredPromoters.map((promoter) => (
-                    <div 
-                      key={promoter.id}
-                      className={cn(
-                        "flex items-center px-2 py-1.5 text-sm rounded-sm cursor-pointer hover:bg-accent hover:text-accent-foreground",
-                        "text-foreground",
-                        !promoter.is_active ? "opacity-70" : ""
-                      )}
-                      onClick={() => handleSelectPromoter(promoter.id)}
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          value === promoter.id ? "opacity-100" : "opacity-0"
-                        )}
-                      />
-                      {promoter.name} {!promoter.is_active && " (Inaktiv)"}
-                    </div>
-                  ))}
-                </CommandGroup>
-              </>
-            )}
-          </Command>
-        </PopoverContent>
-      </Popover>
+              filteredPromoters.map((promoter) => (
+                <SelectItem 
+                  key={promoter.id} 
+                  value={promoter.id} 
+                  className={cn(!promoter.is_active ? "opacity-70" : "")}
+                >
+                  {promoter.name} {!promoter.is_active && " (Inaktiv)"}
+                </SelectItem>
+              ))
+            )
+          )}
+        </SelectContent>
+      </Select>
 
-      {/* Add Promoter Dialog can remain if triggered by an external button, 
-          but it's not needed for the dropdown itself */}
-       {/* 
-      {showAddDialog && (
-        <AddPromoterDialog 
-          // Remove props as the component usage is commented out
-          // open={showAddDialog}
-          // onOpenChange={setShowAddDialog}
-          // onAddPromoter={handleAddPromoter} 
-        />
-      )}
-      */}
+      {/* Add Promoter Dialog can remain if needed elsewhere */}
     </div>
   );
 } 
