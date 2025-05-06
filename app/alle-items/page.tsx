@@ -8,7 +8,10 @@ import { Database } from '@/types/supabase';
 import { calculateItemQuantities } from '@/lib/api/items';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
+import { useToast } from '@/hooks/use-toast';
 
 type BaseItem = Database['public']['Tables']['items']['Row'];
 type ItemQuantities = {
@@ -27,6 +30,7 @@ export default function AlleItemsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const supabase = createBrowserSupabaseClient();
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchItemsAndQuantities = async () => {
@@ -74,6 +78,54 @@ export default function AlleItemsPage() {
     fetchItemsAndQuantities();
   }, [supabase]);
 
+  const handleExportAllItems = () => {
+    if (items.length === 0) {
+      toast({
+        title: "Export nicht möglich",
+        description: "Es sind keine Artikel zum Exportieren vorhanden.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const dataForExcel = items.map(item => ({
+        'Name of the Article': item.name || 'N/A',
+        'ID': item.product_id || 'N/A',
+        'Original number': item.quantities?.originalQuantity || 'N/A',
+        'Total number': item.quantities?.totalQuantity || 'N/A',
+        'Available number': item.quantities?.availableQuantity || 'N/A',
+        'In Circulation number': item.quantities?.inCirculation || 'N/A',
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Alle Artikel");
+
+      // Generate buffer
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+
+      // Create a Blob
+      const blob = new Blob([excelBuffer], {type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8"});
+
+      // Trigger download
+      saveAs(blob, "alle_artikel_export.xlsx");
+
+      toast({
+        title: "Export erfolgreich",
+        description: "Alle Artikel wurden erfolgreich als Excel-Datei exportiert.",
+      });
+
+    } catch (exportError) {
+      console.error("Error exporting items to Excel:", exportError);
+      toast({
+        title: "Export fehlgeschlagen",
+        description: "Beim Exportieren der Artikel ist ein Fehler aufgetreten.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return <div className="container mx-auto p-4">Lade Artikel...</div>;
   }
@@ -84,13 +136,17 @@ export default function AlleItemsPage() {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="mb-4">
+      <div className="flex justify-between items-center mb-4">
         <Link href="/inventory">
           <Button variant="outline">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Zurück
           </Button>
         </Link>
+        <Button variant="outline" onClick={handleExportAllItems}>
+          <Download className="mr-2 h-4 w-4" />
+          Export All Items
+        </Button>
       </div>
 
       <h1 className="text-2xl font-bold mb-4">Alle Artikel (Übersicht)</h1>
